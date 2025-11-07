@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Enable connection pooling for Neon
+  directUrl = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password_hash String
+  full_name     String
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  profile Profile?
+  
+  @@map("users")
+}
+
+model Profile {
+  id            String   @id @default(cuid())
+  user_id       String   @unique
+  bio           String?
+  company       String?
+  position      String?
+  phone         String?
+  education     String?
+  avatar_url    String?
+  handles       Json?    // JSONB: {"connect": "@username.connect", "visuals": "@username.visuals", ...}
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@map("profiles")
+}

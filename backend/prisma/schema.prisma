@@ -1,0 +1,502 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Enable connection pooling for Neon
+  // For Neon, use the connection pooler URL if available
+  // connection_limit = 10  // Maximum connections per instance (optional, Neon manages this)
+  // pool_timeout = 20      // Timeout in seconds (optional)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  password_hash String
+  full_name     String
+  role          String    @default("user") // 'user', 'moderator', 'admin'
+  is_verified   Boolean   @default(false)
+  is_suspended  Boolean   @default(false)
+  suspended_until DateTime?
+  last_active   DateTime?
+  settings      Json?     // User preferences and settings
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  profile Profile?
+  posts Post[]
+  comments Comment[]
+  reactions Reaction[]
+  sentContacts Contact[] @relation("ContactSender")
+  receivedContacts Contact[] @relation("ContactReceiver")
+  sentNotifications Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationReceiver")
+  sentMessages Message[]
+  readMessages MessageRead[]
+  createdThreads Thread[]
+  threadReplies ThreadReply[]
+  postedJobs Job[]
+  jobApplications Application[]
+  endorsements Endorsement[] @relation("EndorsementGiver")
+  receivedEndorsements Endorsement[] @relation("EndorsementReceiver")
+  reports Report[] @relation("ReportReporter")
+  reportedReports Report[] @relation("ReportTarget")
+  pollVotes PollVote[]
+  bookmarks Bookmark[]
+  storyHighlights StoryHighlight[]
+  refreshTokens RefreshToken[]
+  
+  @@index([role])
+  @@index([is_suspended])
+  @@map("users")
+}
+
+model Profile {
+  id               String   @id @default(cuid())
+  user_id          String   @unique
+  bio              String?
+  company          String?
+  position         String?
+  phone            String?
+  education        String?
+  avatar_url       String?
+  handles          Json?    // JSONB: {"connect": "@username.connect", "visuals": "@username.visuals", ...}
+  visibility_presets Json?  // JSONB: {"personal": {...}, "professional": {...}, "custom": {...}}
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@map("profiles")
+}
+
+model Post {
+  id            String    @id @default(cuid())
+  user_id       String
+  content       String
+  module        String    // 'connect', 'visuals', 'threads', 'careernet', or comma-separated for cross-post
+  visibility    String    @default("public") // 'public', 'private', 'followers'
+  network_type  String    @default("both") // 'personal', 'professional', 'both'
+  media_urls    Json?     // Array of Cloudinary URLs
+  tags          Json?     // Array of hashtags
+  parent_id     String?   // For replies/reposts
+  is_story      Boolean   @default(false)
+  is_reel       Boolean   @default(false)
+  is_poll       Boolean   @default(false)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  comments Comment[]
+  reactions Reaction[]
+  parent Post? @relation("PostReplies", fields: [parent_id], references: [id])
+  replies Post[] @relation("PostReplies")
+  pollOptions PollOption[]
+  pollVotes PollVote[]
+  bookmarks Bookmark[]
+  
+  @@index([user_id])
+  @@index([created_at])
+  @@index([module])
+  @@index([visibility])
+  @@index([network_type])
+  @@map("posts")
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  post_id       String
+  user_id       String
+  content       String
+  parent_id     String?  // For nested comments (up to 3 levels)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent Comment? @relation("CommentReplies", fields: [parent_id], references: [id])
+  replies Comment[] @relation("CommentReplies")
+  
+  @@index([post_id])
+  @@index([user_id])
+  @@map("comments")
+}
+
+model Reaction {
+  id            String   @id @default(cuid())
+  post_id       String?
+  user_id       String
+  type          String   // 'like', 'love', 'wow', 'sad', 'angry', 'endorse'
+  created_at    DateTime @default(now())
+  
+  post Post? @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([post_id, user_id])
+  @@index([post_id])
+  @@index([user_id])
+  @@map("reactions")
+}
+
+model Contact {
+  id            String   @id @default(cuid())
+  sender_id     String
+  receiver_id  String
+  status       String   @default("pending") // 'pending', 'approved', 'rejected'
+  sender_preset String?  // 'personal', 'professional', 'custom' (what sender chose to share)
+  receiver_preset String? // 'personal', 'professional', 'custom' (what receiver chose to share when approving)
+  shared_data   Json?    // Data shared based on preset
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  sender User @relation("ContactSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User @relation("ContactReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+  
+  @@unique([sender_id, receiver_id])
+  @@index([sender_id])
+  @@index([receiver_id])
+  @@index([status])
+  @@map("contacts")
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  user_id       String   // Receiver
+  sender_id     String?
+  type          String   // 'follow', 'message', 'reaction', 'comment', 'qr_scan', 'endorse'
+  title         String
+  message       String
+  link          String?  // URL to related content
+  read          Boolean  @default(false)
+  created_at    DateTime @default(now())
+  
+  user User @relation("NotificationReceiver", fields: [user_id], references: [id], onDelete: Cascade)
+  sender User? @relation("NotificationSender", fields: [sender_id], references: [id], onDelete: SetNull)
+  
+  @@index([user_id])
+  @@index([read])
+  @@index([created_at])
+  @@map("notifications")
+}
+
+model QrToken {
+  id            String   @id @default(cuid())
+  user_id       String
+  token         String   @unique
+  preset_name   String   // 'personal', 'professional', 'custom'
+  consumed_by   String?  // User ID who consumed the token
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+  
+  @@index([token])
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("qr_tokens")
+}
+
+// Refresh Tokens for JWT authentication
+model RefreshToken {
+  id            String   @id @default(cuid())
+  user_id       String
+  token         String   // Hashed refresh token
+  expires_at    DateTime
+  created_at    DateTime @default(now())
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@index([user_id])
+  @@index([expires_at])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model ChatThread {
+  id            String   @id @default(cuid())
+  type          String   @default("1:1") // '1:1', 'group'
+  name          String?  // Group name (if type is 'group')
+  participants  Json     // Array of user IDs
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  messages Message[]
+  
+  @@index([created_at])
+  @@map("chat_threads")
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  thread_id     String
+  user_id       String
+  content       String   // Encrypted content
+  encrypted     Boolean  @default(true)
+  media_urls    Json?    // Array of Cloudinary URLs
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  thread ChatThread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  reads MessageRead[]
+  
+  @@index([thread_id])
+  @@index([user_id])
+  @@index([created_at])
+  @@map("messages")
+}
+
+model MessageRead {
+  id            String   @id @default(cuid())
+  message_id    String
+  user_id       String
+  read_at       DateTime @default(now())
+  
+  message Message @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([message_id, user_id])
+  @@index([message_id])
+  @@index([user_id])
+  @@map("message_reads")
+}
+
+// Threads Module: Discussion threads/topics
+model Thread {
+  id            String   @id @default(cuid())
+  user_id       String
+  title         String
+  content       String
+  topic         String?  // Category/topic tag
+  pinned        Boolean  @default(false)
+  locked        Boolean  @default(false)
+  views_count   Int      @default(0)
+  replies_count Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  replies ThreadReply[]
+  
+  @@index([user_id])
+  @@index([topic])
+  @@index([created_at])
+  @@index([pinned])
+  @@map("threads")
+}
+
+model ThreadReply {
+  id            String   @id @default(cuid())
+  thread_id     String
+  user_id       String
+  content       String
+  parent_id     String?  // For nested replies
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  thread Thread @relation(fields: [thread_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  parent ThreadReply? @relation("ThreadReplyReplies", fields: [parent_id], references: [id])
+  replies ThreadReply[] @relation("ThreadReplyReplies")
+  
+  @@index([thread_id])
+  @@index([user_id])
+  @@index([created_at])
+  @@map("thread_replies")
+}
+
+// CareerNet Module: Jobs, Applications, Endorsements
+model Job {
+  id            String   @id @default(cuid())
+  user_id       String   // Employer/Poster
+  title         String
+  description   String
+  company       String?
+  location      String?
+  type          String?  // 'full-time', 'part-time', 'contract', 'internship'
+  salary_range  String?
+  requirements  Json?    // Array of requirements
+  tags          Json?    // Array of skill tags
+  application_url String?
+  application_email String?
+  status        String   @default("open") // 'open', 'closed', 'filled'
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  applications Application[]
+  
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("jobs")
+}
+
+model Application {
+  id            String   @id @default(cuid())
+  job_id        String
+  user_id       String   // Applicant
+  cover_letter  String?
+  resume_url    String?  // Cloudinary URL
+  status        String   @default("pending") // 'pending', 'reviewed', 'interviewed', 'accepted', 'rejected'
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  job Job @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([job_id, user_id])
+  @@index([job_id])
+  @@index([user_id])
+  @@index([status])
+  @@map("applications")
+}
+
+model Endorsement {
+  id            String   @id @default(cuid())
+  giver_id      String   // User giving endorsement
+  receiver_id   String   // User receiving endorsement
+  skill         String   // Skill being endorsed
+  message       String?  // Optional endorsement message
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  giver User @relation("EndorsementGiver", fields: [giver_id], references: [id], onDelete: Cascade)
+  receiver User @relation("EndorsementReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+  
+  @@unique([giver_id, receiver_id, skill])
+  @@index([receiver_id])
+  @@index([skill])
+  @@map("endorsements")
+}
+
+// Live Streaming/Calls
+model CallSession {
+  id            String   @id @default(cuid())
+  host_id       String   // User hosting the call
+  type          String   @default("live") // 'live', 'call'
+  title         String?
+  description   String?
+  agora_channel String?  // Agora channel name
+  agora_token   String?  // Agora token
+  status        String   @default("scheduled") // 'scheduled', 'active', 'ended'
+  scheduled_at  DateTime?
+  started_at    DateTime?
+  ended_at      DateTime?
+  participants  Json?    // Array of user IDs
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  @@index([host_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("call_sessions")
+}
+
+// Content Moderation
+model Report {
+  id            String   @id @default(cuid())
+  reporter_id   String   // User reporting
+  target_type   String   // 'post', 'comment', 'user', 'thread', 'job'
+  target_id     String   // ID of reported content/user
+  reason        String   // 'spam', 'harassment', 'inappropriate', 'fake', 'other'
+  description   String?  // Additional details
+  status        String   @default("pending") // 'pending', 'reviewed', 'resolved', 'dismissed'
+  reviewed_by   String?  // Admin/moderator who reviewed
+  reviewed_at   DateTime?
+  action_taken  String?  // 'warned', 'suspended', 'removed', 'none'
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  reporter User @relation("ReportReporter", fields: [reporter_id], references: [id], onDelete: Cascade)
+  target User? @relation("ReportTarget", fields: [target_id], references: [id], onDelete: SetNull)
+  
+  @@index([target_type, target_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("reports")
+}
+
+// Analytics/Activity Logs
+model ActivityLog {
+  id            String   @id @default(cuid())
+  user_id       String?
+  action        String   // 'login', 'post_created', 'follow', 'message_sent', etc.
+  entity_type   String?  // 'post', 'user', 'comment', etc.
+  entity_id     String?
+  metadata      Json?    // Additional data
+  ip_address    String?
+  user_agent    String?
+  created_at    DateTime @default(now())
+  
+  @@index([user_id])
+  @@index([action])
+  @@index([created_at])
+  @@map("activity_logs")
+}
+
+// Polls
+model PollOption {
+  id            String   @id @default(cuid())
+  post_id       String
+  option_text   String
+  vote_count    Int      @default(0)
+  created_at    DateTime @default(now())
+  
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  votes PollVote[]
+  
+  @@index([post_id])
+  @@map("poll_options")
+}
+
+model PollVote {
+  id            String   @id @default(cuid())
+  post_id       String
+  option_id     String
+  user_id       String
+  created_at    DateTime @default(now())
+  
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  option PollOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([post_id, user_id])
+  @@index([post_id])
+  @@index([option_id])
+  @@index([user_id])
+  @@map("poll_votes")
+}
+
+// Bookmarks
+model Bookmark {
+  id            String   @id @default(cuid())
+  user_id       String
+  post_id       String
+  created_at    DateTime @default(now())
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  
+  @@unique([user_id, post_id])
+  @@index([user_id])
+  @@index([post_id])
+  @@map("bookmarks")
+}
+
+// Story Highlights
+model StoryHighlight {
+  id            String   @id @default(cuid())
+  user_id       String
+  title         String
+  cover_url     String?  // Cover image URL
+  story_ids     Json     // Array of story post IDs
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@index([user_id])
+  @@map("story_highlights")
+}
