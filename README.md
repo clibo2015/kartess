@@ -350,4 +350,5 @@ This is a private project. For questions or contributions, please contact the ma
 
 ---
 
-Built with ❤️ using Next.js, Express.js, and PostgreSQL
+Built with ❤️ using Next.js, Express.js, and PostgreSQL#   K a r t e s s  
+ 
