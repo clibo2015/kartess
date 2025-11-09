@@ -67,17 +67,14 @@ app.use(compression());
 const allowedOrigins = isProduction && process.env.FRONTEND_URL
   ? [process.env.FRONTEND_URL]
   : isProduction
-  ? [] // In production without FRONTEND_URL, deny all (security)
+  ? ['https://kartess-production.up.railway.app', 'http://localhost:3000', /^https:\/\/.*\.vercel\.app$/] // Temporarily allow Railway URL for testing
   : ['http://localhost:3000', /^https:\/\/.*\.vercel\.app$/]; // Development
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, curl, Postman, etc.)
     if (!origin) {
-      // In production, be more restrictive
-      if (isProduction) {
-        return callback(new Error('CORS: Origin header required in production'), false);
-      }
+      // Allow health checks and API testing without origin
       return callback(null, true);
     }
     
