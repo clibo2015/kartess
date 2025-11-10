@@ -32,7 +32,7 @@ export default function LiveStreamView() {
   const isHost = sessionData?.session?.host_id === currentUser?.id || !sessionId;
 
   // Only use Agora hook when sessionData is loaded
-  const { isConnected, localVideoTrack, remoteUsers } = useAgora(
+  const { isConnected, isConnecting, error, localVideoTrack, remoteUsers } = useAgora(
     sessionData
       ? {
           appId: sessionData.appId || '',
@@ -40,6 +40,7 @@ export default function LiveStreamView() {
           token: sessionData.token || null,
           uid: sessionData.uid || currentUser?.id || '',
           role: isHost ? 'host' : 'audience',
+          enableVideo: isHost, // Always enable video for live streaming hosts
         }
       : {
           appId: '',
@@ -47,6 +48,7 @@ export default function LiveStreamView() {
           token: null,
           uid: '',
           role: 'audience',
+          enableVideo: false,
         }
   );
 
@@ -119,9 +121,39 @@ export default function LiveStreamView() {
             </div>
           </div>
 
-          {!isConnected && (
+          {(isConnecting || (!isConnected && !error)) && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <p className="text-white">Connecting...</p>
+              <div className="text-center text-white">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4">Connecting to stream...</p>
+                <p className="text-sm text-gray-300 mt-2">Please allow camera and microphone access</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+              <div className="text-center text-white max-w-md mx-4">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-xl font-bold mb-2">Connection Error</h3>
+                <p className="text-gray-300 mb-6">{error}</p>
+                <div className="flex gap-4 justify-center">
+                  <Button
+                    variant="primary"
+                    onClick={() => window.location.reload()}
+                    className="bg-blue-600"
+                  >
+                    Try Again
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push('/live')}
+                    className="bg-gray-600"
+                  >
+                    Go Back
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </div>

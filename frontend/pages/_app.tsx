@@ -19,15 +19,18 @@ export default function App({ Component, pageProps }: AppProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 60 * 1000, // 1 minute
+            staleTime: 5 * 60 * 1000, // 5 minutes - increased to reduce refetches
+            cacheTime: 10 * 60 * 1000, // 10 minutes cache
             refetchOnWindowFocus: false,
+            refetchOnMount: false, // Don't refetch on mount if data is fresh
+            retry: 1, // Only retry once on failure
           },
         },
       })
   );
 
   useEffect(() => {
-    // Validate token on app load - clear if expired/invalid
+    // Validate token on app load - defer to avoid blocking initial render
     const validateTokenOnLoad = async () => {
       if (typeof window === 'undefined') return;
       
@@ -37,6 +40,11 @@ export default function App({ Component, pageProps }: AppProps) {
         clearAuth();
         sessionStorage.removeItem('kartess_auth_verified');
         return;
+      }
+
+      // Check if already verified in this session
+      if (sessionStorage.getItem('kartess_auth_verified') === 'true') {
+        return; // Skip verification if already verified
       }
 
       try {
@@ -51,19 +59,30 @@ export default function App({ Component, pageProps }: AppProps) {
       }
     };
 
-    // Run token validation on app load
-    validateTokenOnLoad();
+    // Defer token validation to avoid blocking initial render
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(validateTokenOnLoad, { timeout: 3000 });
+    } else {
+      setTimeout(validateTokenOnLoad, 100);
+    }
 
     // Register service worker and request push notification permission
+    // Defer to avoid blocking initial render - use requestIdleCallback if available
     if (typeof window !== 'undefined') {
-      // Delay service worker registration to avoid blocking initial render
-      setTimeout(() => {
+      const registerServiceWorkerDeferred = () => {
         requestNotificationPermission().catch(console.error).then((granted) => {
           if (granted) {
             registerServiceWorker().catch(console.error);
           }
         });
-      }, 1000);
+      };
+
+      // Use requestIdleCallback for better performance, fallback to setTimeout
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(registerServiceWorkerDeferred, { timeout: 5000 });
+      } else {
+        setTimeout(registerServiceWorkerDeferred, 2000);
+      }
     }
   }, []);
 

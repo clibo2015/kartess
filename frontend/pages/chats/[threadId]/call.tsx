@@ -36,21 +36,23 @@ export default function CallView() {
     enabled: !!threadId,
   });
 
-  const { isConnected, localVideoTrack, remoteUsers } = useAgora(
+  const { isConnected, isConnecting, error, localVideoTrack, remoteUsers } = useAgora(
     sessionData
       ? {
-          appId: sessionData.appId,
-          channel: sessionData.channel,
-          token: sessionData.token,
-          uid: sessionData.uid,
+          appId: sessionData.appId || '',
+          channel: sessionData.channel || '',
+          token: sessionData.token || null,
+          uid: sessionData.uid || '',
           role: 'host',
+          enableVideo: isVideo, // Enable video only for video calls
         }
       : {
           appId: '',
           channel: '',
-          token: '',
+          token: null,
           uid: '',
           role: 'host',
+          enableVideo: isVideo,
         }
   );
 
@@ -119,9 +121,41 @@ export default function CallView() {
             </div>
           </div>
 
-          {!isConnected && (
+          {(isConnecting || (!isConnected && !error)) && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-              <p className="text-white">Connecting...</p>
+              <div className="text-center text-white">
+                <LoadingSpinner size="lg" />
+                <p className="mt-4">Connecting...</p>
+                <p className="text-sm text-gray-300 mt-2">
+                  {isVideo ? 'Please allow camera and microphone access' : 'Please allow microphone access'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+              <div className="text-center text-white max-w-md mx-4">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h3 className="text-xl font-bold mb-2">Call Error</h3>
+                <p className="text-gray-300 mb-6">{error}</p>
+                <div className="flex gap-4 justify-center">
+                  <Button
+                    variant="primary"
+                    onClick={() => window.location.reload()}
+                    className="bg-blue-600"
+                  >
+                    Try Again
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push(`/chats/${threadId}`)}
+                    className="bg-gray-600"
+                  >
+                    Go Back
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 

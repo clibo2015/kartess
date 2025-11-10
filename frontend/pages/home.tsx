@@ -4,9 +4,18 @@ import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import BottomNav from '../components/BottomNav';
 import PostCard from '../components/PostCard';
-import CreatePostModal from '../components/CreatePostModal';
-import StoriesCarousel from '../components/StoriesCarousel';
-import CreateStoryModal from '../components/CreateStoryModal';
+import dynamic from 'next/dynamic';
+
+// Lazy load heavy modal components
+const CreatePostModal = dynamic(() => import('../components/CreatePostModal'), {
+  ssr: false,
+});
+const StoriesCarousel = dynamic(() => import('../components/StoriesCarousel'), {
+  ssr: false,
+});
+const CreateStoryModal = dynamic(() => import('../components/CreateStoryModal'), {
+  ssr: false,
+});
 import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Logo from '../components/Logo';
@@ -16,7 +25,13 @@ import { getUser } from '../lib/auth';
 import Image from 'next/image';
 import Link from 'next/link';
 
-const modules = ['all', 'connect', 'visuals', 'threads', 'careernet'];
+const modules = [
+  { key: 'all', label: 'All' },
+  { key: 'connect', label: 'Connect' },
+  { key: 'visuals', label: 'Visuals' },
+  { key: 'threads', label: 'Threads' },
+  { key: 'careernet', label: 'Career' },
+];
 const sortOptions = ['chrono', 'algorithmic'];
 
 export default function Home() {
@@ -150,7 +165,7 @@ useEffect(() => {
             {/* Module Filters */}
             <div className="relative -mx-4 px-4">
               <div 
-                className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide"
                 style={{
                   WebkitOverflowScrolling: 'touch',
                   scrollbarWidth: 'none',
@@ -159,15 +174,15 @@ useEffect(() => {
               >
                 {modules.map((module) => (
                   <button
-                    key={module}
-                    onClick={() => setSelectedModule(module)}
-                    className={`flex-shrink-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap ${
-                      selectedModule === module
+                    key={module.key}
+                    onClick={() => setSelectedModule(module.key)}
+                    className={`flex-shrink-0 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap ${
+                      selectedModule === module.key
                         ? 'bg-blue-600 dark:bg-blue-500 text-white'
                         : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                     }`}
                   >
-                    {module.charAt(0).toUpperCase() + module.slice(1)}
+                    {module.label}
                   </button>
                 ))}
               </div>

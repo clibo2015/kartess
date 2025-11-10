@@ -384,20 +384,20 @@ export default function ChatView() {
           )}
 
           {/* Input */}
-          <div className="bg-white border-t border-gray-200 px-4 py-3">
-            <div className="flex gap-2 mb-2 min-w-0">
+          <div className="bg-white border-t border-gray-200 px-3 sm:px-4 py-3 pb-safe">
+            <div className="flex gap-1.5 sm:gap-2 mb-2 min-w-0 overflow-x-auto scrollbar-hide">
               <Link href={`/chats/${activeThreadId}/call?type=voice`} className="flex-shrink-0">
-                <Button variant="secondary" className="px-3 py-2 text-sm whitespace-nowrap">
+                <Button variant="secondary" className="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm whitespace-nowrap">
                   📞 Voice
                 </Button>
               </Link>
               <Link href={`/chats/${activeThreadId}/call?type=video`} className="flex-shrink-0">
-                <Button variant="secondary" className="px-3 py-2 text-sm whitespace-nowrap">
+                <Button variant="secondary" className="px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm whitespace-nowrap">
                   📹 Video
                 </Button>
               </Link>
             </div>
-            <form onSubmit={handleSend} className="flex items-center gap-2">
+            <form onSubmit={handleSend} className="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -409,7 +409,7 @@ export default function ChatView() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-600"
+                className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-600 text-sm sm:text-base"
                 title="Attach media"
               >
                 📎
@@ -419,13 +419,13 @@ export default function ChatView() {
                 value={message}
                 onChange={(e) => handleTyping(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 min-w-0 min-h-[36px] sm:min-h-[44px] px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <Button
                 type="submit"
                 variant="primary"
                 disabled={(!message.trim() && mediaFiles.length === 0) || sendMutation.isPending}
-                className="px-6"
+                className="flex-shrink-0 px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap"
               >
                 Send
               </Button>

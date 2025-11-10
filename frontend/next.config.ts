@@ -3,6 +3,14 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // Performance optimizations
+  swcMinify: true,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  // Optimize images
   images: {
     remotePatterns: [
       {
@@ -14,6 +22,17 @@ const nextConfig: NextConfig = {
         hostname: '**.cloudinary.com',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+  // Enable compression
+  compress: true,
+  // Optimize production builds
+  productionBrowserSourceMaps: false,
+  // Enable experimental features for better performance
+  experimental: {
+    optimizePackageImports: ['@tanstack/react-query', 'framer-motion'],
   },
   // Security headers
   async headers() {
@@ -39,7 +58,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(self), geolocation=()',
           },
         ],
       },
