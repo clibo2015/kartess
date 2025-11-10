@@ -47,11 +47,6 @@ export function DarkModeProvider({ children }: { children: ReactNode }) {
     setIsDark(value);
   };
 
-  // Prevent flash of wrong theme on initial load
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
   return (
     <DarkModeContext.Provider value={{ isDark, toggleDarkMode, setDarkMode }}>
       {children}

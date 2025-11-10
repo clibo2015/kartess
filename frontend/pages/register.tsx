@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { z } from 'zod';
+import { isAxiosError } from 'axios';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -81,17 +82,18 @@ export default function Register() {
 
       // Redirect to profile completion
       router.push('/profile-complete');
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
+        error.issues.forEach((issue) => {
+          const pathKey = issue.path[0];
+          if (typeof pathKey === 'string') {
+            fieldErrors[pathKey] = issue.message;
           }
         });
         setErrors(fieldErrors);
-      } else if (error.response?.data) {
-        const errorMessage = error.response.data.error || 'Registration failed';
+      } else if (isAxiosError(error) && error.response?.data) {
+        const errorMessage = (error.response.data as { error?: string })?.error || 'Registration failed';
         if (errorMessage.includes('Email')) {
           setErrors({ email: errorMessage });
         } else if (errorMessage.includes('Username')) {

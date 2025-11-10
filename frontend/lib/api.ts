@@ -700,6 +700,7 @@ export const liveAPI = {
   },
 
   joinSession: async (sessionId: string): Promise<{
+    session?: any;
     token: string;
     channel: string;
     appId: string;

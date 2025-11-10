@@ -85,10 +85,10 @@ export default function Search() {
             </div>
 
             {/* Autocomplete Suggestions */}
-            {(hashtagSuggestions?.suggestions.length > 0 ||
-              mentionSuggestions?.suggestions.length > 0) && (
+            {(((hashtagSuggestions?.suggestions?.length ?? 0) > 0) ||
+              ((mentionSuggestions?.suggestions?.length ?? 0) > 0)) && (
               <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {hashtagSuggestions?.suggestions.map((suggestion: any, idx: number) => (
+                {hashtagSuggestions?.suggestions?.map((suggestion: any, idx: number) => (
                   <button
                     key={idx}
                     onClick={() => {
@@ -101,7 +101,7 @@ export default function Search() {
                     <span className="text-xs text-gray-500">{suggestion.count} posts</span>
                   </button>
                 ))}
-                {mentionSuggestions?.suggestions.map((suggestion: any, idx: number) => (
+                {mentionSuggestions?.suggestions?.map((suggestion: any, idx: number) => (
                   <Link
                     key={idx}
                     href={`/${suggestion.username}/profile`}

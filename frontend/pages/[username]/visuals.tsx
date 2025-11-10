@@ -50,7 +50,7 @@ export default function VisualsFeed() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['visualsPosts', targetUserId],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       if (targetUserId) {
         const result = await postsAPI.getUserPosts(targetUserId, {
           module: 'visuals',

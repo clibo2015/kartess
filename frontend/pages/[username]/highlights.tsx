@@ -64,7 +64,7 @@ export default function StoryHighlights() {
               <p className="text-gray-500">No highlights yet</p>
               {isOwnProfile && (
                 <Button
-                  variant="link"
+                  variant="secondary"
                   onClick={() => setIsCreating(true)}
                   className="mt-2"
                 >

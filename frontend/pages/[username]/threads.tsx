@@ -56,7 +56,7 @@ export default function ThreadsFeed() {
     refetch: refetchPosts,
   } = useInfiniteQuery({
     queryKey: ['threadPosts', targetUserId, viewMode],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const params = {
         cursor: pageParam,
         limit: 20,
@@ -92,7 +92,7 @@ export default function ThreadsFeed() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['threads', selectedTopic, sortBy],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const result = await threadsAPI.getThreads({
         topic: selectedTopic || undefined,
         sort: sortBy,

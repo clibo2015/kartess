@@ -35,7 +35,7 @@ export default function CareerNet() {
     refetch: refetchFeed,
   } = useInfiniteQuery({
     queryKey: ['careernetFeed'],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const result = await postsAPI.getModulePosts('careernet', {
         cursor: pageParam,
         limit: 20,
@@ -109,7 +109,7 @@ export default function CareerNet() {
     isLoading: isLoadingJobs,
   } = useInfiniteQuery({
     queryKey: ['careernetJobs', searchQuery, typeFilter, locationFilter],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const result = await careernetAPI.getJobs({
         status: 'open',
         type: typeFilter,

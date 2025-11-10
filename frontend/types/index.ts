@@ -3,6 +3,8 @@ export interface User {
   email: string;
   username: string;
   full_name: string;
+  role?: 'admin' | 'moderator' | 'user';
+  profile?: Profile;
 }
 
 export interface Profile {

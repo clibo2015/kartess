@@ -13,10 +13,13 @@ export default function BookmarkButton({ postId }: BookmarkButtonProps) {
   const { data } = useQuery({
     queryKey: ['bookmarkCheck', postId],
     queryFn: () => bookmarksAPI.checkBookmarked(postId),
-    onSuccess: (data) => {
-      setBookmarked(data.bookmarked);
-    },
   });
+
+  useEffect(() => {
+    if (data) {
+      setBookmarked(data.bookmarked);
+    }
+  }, [data]);
 
   const bookmarkMutation = useMutation({
     mutationFn: () => (bookmarked ? bookmarksAPI.unbookmark(postId) : bookmarksAPI.bookmark(postId)),

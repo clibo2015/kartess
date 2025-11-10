@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { z } from 'zod';
+import { isAxiosError } from 'axios';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -52,10 +53,10 @@ export default function Login() {
       } else {
         router.push('/profile-complete');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        setError(error.errors[0].message);
-      } else if (error.response?.data?.error) {
+        setError(error.issues[0]?.message || 'Invalid input.');
+      } else if (isAxiosError(error) && error.response?.data?.error) {
         setError(error.response.data.error);
       } else {
         setError('Login failed. Please check your credentials.');

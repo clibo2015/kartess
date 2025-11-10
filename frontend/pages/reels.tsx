@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import BottomNav from '../components/BottomNav';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 import CreatePostModal from '../components/CreatePostModal';
+import ReactionsBar from '../components/ReactionsBar';
 import { postsAPI } from '../lib/api';
 import { getSocket } from '../lib/socket';
 import { getUser } from '../lib/auth';
@@ -21,14 +22,16 @@ export default function Reels() {
   const currentUser = getUser();
 
   // Fetch reels (posts where is_reel = true)
+  type ReelsPage = Awaited<ReturnType<typeof postsAPI.getReels>>;
+
   const {
-    data,
+    data: reelsData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading,
     refetch,
-  } = useInfiniteQuery({
+  } = useInfiniteQuery<ReelsPage, Error, ReelsPage, [string], string | undefined>({
     queryKey: ['reels'],
     queryFn: async ({ pageParam }) => {
       const result = await postsAPI.getReels({
@@ -37,11 +40,14 @@ export default function Reels() {
       });
       return result;
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     initialPageParam: undefined,
   });
 
-  const reels = data?.pages.flatMap((page) => page.posts) || [];
+  const reelsPages =
+    (reelsData as InfiniteData<ReelsPage, string | undefined> | undefined)?.pages ?? [];
+
+  const reels = reelsPages.flatMap((page: ReelsPage) => page.posts ?? []);
 
   // Set up Socket.io for real-time updates
   useEffect(() => {

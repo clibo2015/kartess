@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Layout from '../components/Layout';
 import BottomNav from '../components/BottomNav';
@@ -30,14 +30,22 @@ export default function Home() {
   const currentUser = getUser();
 
   // Fetch timeline with infinite scroll
+  type TimelinePage = Awaited<ReturnType<typeof postsAPI.getTimeline>>;
+
   const {
-    data,
+    data: timelineData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     isLoading,
     refetch,
-  } = useInfiniteQuery({
+  } = useInfiniteQuery<
+    TimelinePage,
+    Error,
+    TimelinePage,
+    [string, string, string],
+    string | undefined
+  >({
     queryKey: ['timeline', selectedModule, sortBy],
     queryFn: async ({ pageParam }) => {
       const result = await postsAPI.getTimeline({
@@ -48,13 +56,16 @@ export default function Home() {
       });
       return result;
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     initialPageParam: undefined,
   });
 
+  const timelinePages =
+    (timelineData as InfiniteData<TimelinePage, string | undefined> | undefined)?.pages ?? [];
+
   const posts =
-    data?.pages
-      ?.flatMap((page) => page.posts)
+    timelinePages
+      .flatMap((page: TimelinePage) => page.posts ?? [])
       ?.filter((post: any) => !post.is_reel) ?? [];
 
   // Fetch stories
@@ -280,7 +291,7 @@ useEffect(() => {
               </div>
             ) : (
               <>
-                {posts.map((post) => (
+                {posts.map((post: any) => (
                   <PostCard key={post.id} post={post} />
                 ))}
 

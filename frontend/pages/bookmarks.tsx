@@ -15,7 +15,7 @@ export default function Bookmarks() {
     isLoading,
   } = useInfiniteQuery({
     queryKey: ['bookmarks'],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const result = await bookmarksAPI.getBookmarks({
         cursor: pageParam,
         limit: 20,

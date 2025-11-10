@@ -21,7 +21,7 @@ export default function CreatePollModal({
   const [options, setOptions] = useState(['', '']);
 
   const createPostMutation = useMutation({
-    mutationFn: (data: any) => postsAPI.createPost(data),
+    mutationFn: (data: any) => postsAPI.create(data),
     onSuccess: async (post) => {
       // Create poll after post is created
       await pollsAPI.create(

@@ -47,7 +47,7 @@ export default function ConnectFeed() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['connectPosts', targetUserId],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       if (targetUserId) {
         // User-specific posts
         const result = await postsAPI.getUserPosts(targetUserId, {

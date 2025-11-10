@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { z } from 'zod';
+import { isAxiosError } from 'axios';
 import Layout from '../components/Layout';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -151,17 +152,19 @@ export default function ProfileComplete() {
 
       // Redirect to home
       router.push('/home');
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
+        error.issues.forEach((issue) => {
+          const pathKey = issue.path[0];
+          if (typeof pathKey === 'string') {
+            fieldErrors[pathKey] = issue.message;
           }
         });
         setErrors(fieldErrors);
-      } else if (error.response?.data) {
-        setErrors({ general: error.response.data.error || 'Failed to complete profile' });
+      } else if (isAxiosError(error) && error.response?.data) {
+        const errorMessage = (error.response.data as { error?: string })?.error;
+        setErrors({ general: errorMessage || 'Failed to complete profile' });
       } else {
         setErrors({ general: 'An error occurred. Please try again.' });
       }

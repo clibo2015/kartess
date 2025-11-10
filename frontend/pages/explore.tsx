@@ -24,7 +24,7 @@ export default function Explore() {
     refetch,
   } = useInfiniteQuery({
     queryKey: ['exploreVisuals'],
-    queryFn: async ({ pageParam }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | undefined }) => {
       const result = await postsAPI.getTimeline({
         module: 'visuals',
         sort: 'algorithmic', // Popular/algorithmic feed
