@@ -20,7 +20,7 @@ export default function App({ Component, pageProps }: AppProps) {
         defaultOptions: {
           queries: {
             staleTime: 5 * 60 * 1000, // 5 minutes - increased to reduce refetches
-            cacheTime: 10 * 60 * 1000, // 10 minutes cache
+            gcTime: 10 * 60 * 1000, // 10 minutes garbage collection time (formerly cacheTime)
             refetchOnWindowFocus: false,
             refetchOnMount: false, // Don't refetch on mount if data is fresh
             retry: 1, // Only retry once on failure
