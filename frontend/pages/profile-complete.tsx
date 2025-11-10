@@ -67,7 +67,7 @@ export default function ProfileComplete() {
       } catch (error) {
         // If verification fails, don't immediately redirect to login
         // The user might have just registered and the token is valid but verify call failed
-        // (e.g., due to network issues, CSRF token not yet available, etc.)
+        // (e.g., due to network issues, etc.)
         // Allow user to stay on the page - they can still complete their profile
         // Only redirect if token is definitely invalid (which would be handled by the token check above)
         console.warn('Token verification failed, but allowing user to continue:', error);

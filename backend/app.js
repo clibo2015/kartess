@@ -133,17 +133,8 @@ const authLimiter = rateLimit({
 app.use(limiter);
 app.use('/api/auth', authLimiter);
 
-// Cookie parser for CSRF tokens
-const cookieParser = require('cookie-parser');
-app.use(cookieParser());
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// CSRF protection (before routes)
-const { csrfProtection, setCSRFToken } = require('./middleware/csrf');
-app.use(setCSRFToken); // Set CSRF token for all requests
-app.use(csrfProtection); // Validate CSRF for state-changing requests
 
 // Routes
 const authRoutes = require('./routes/auth');
