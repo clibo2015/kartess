@@ -319,30 +319,39 @@ export default function CareerNet() {
               />
 
               {/* Filters */}
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                <button
-                  onClick={() => setTypeFilter(undefined)}
-                  className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${
-                    !typeFilter
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+              <div className="relative -mx-4 px-4">
+                <div 
+                  className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                  }}
                 >
-                  All Types
-                </button>
-                {jobTypes.map((type) => (
                   <button
-                    key={type}
-                    onClick={() => setTypeFilter(type)}
-                    className={`px-3 py-1 rounded-full text-sm whitespace-nowrap capitalize ${
-                      typeFilter === type
+                    onClick={() => setTypeFilter(undefined)}
+                    className={`flex-shrink-0 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
+                      !typeFilter
                         ? 'bg-purple-600 text-white'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                   >
-                    {type.replace('-', ' ')}
+                    All Types
                   </button>
-                ))}
+                  {jobTypes.map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setTypeFilter(type)}
+                      className={`flex-shrink-0 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm whitespace-nowrap capitalize ${
+                        typeFilter === type
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {type.replace('-', ' ')}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <input

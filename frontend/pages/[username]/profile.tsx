@@ -167,43 +167,45 @@ export default function UserProfile() {
         <div className="min-h-screen bg-gray-50 pb-20">
           {/* Header with Logo and Notifications */}
           <div className="bg-white border-b border-gray-200 px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between min-w-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
                 <button
                   onClick={() => router.back()}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                  className="w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
                   aria-label="Back"
                 >
                   <span className="text-gray-600 text-xl">←</span>
                 </button>
                 <Logo size="sm" showText={false} onClick={() => {}} />
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">
                   {isCurrentUser ? 'My Profile' : `${user.full_name || 'Profile'}`}
                 </h1>
               </div>
-              <NotificationsBell onClick={() => setNotificationsOpen(true)} />
+              <div className="flex-shrink-0">
+                <NotificationsBell onClick={() => setNotificationsOpen(true)} />
+              </div>
             </div>
           </div>
 
           {/* Edit Profile and Logout Buttons (for current user) */}
           {isCurrentUser && (
             <div className="bg-white border-b border-gray-200 px-4 py-3">
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => router.push('/settings')}
-                  className="bg-black text-white border-black hover:bg-gray-800 flex items-center gap-2"
+                  className="bg-black text-white border-black hover:bg-gray-800 flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base px-3 sm:px-4"
                 >
                   <span>✏️</span>
-                  <span>Edit Profile</span>
+                  <span className="whitespace-nowrap">Edit Profile</span>
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleLogout}
-                  className="bg-red-600 text-white border-red-600 hover:bg-red-700 flex items-center gap-2"
+                  className="bg-red-600 text-white border-red-600 hover:bg-red-700 flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base px-3 sm:px-4"
                 >
                   <span>🚪</span>
-                  <span>Logout</span>
+                  <span className="whitespace-nowrap">Logout</span>
                 </Button>
               </div>
             </div>
@@ -231,12 +233,12 @@ export default function UserProfile() {
                 </div>
 
                 {/* User Details */}
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 truncate">
                     {user.full_name || 'User'}
                   </h2>
-                  <p className="text-gray-600 text-base mb-1">@{user.username || 'unknown'}</p>
-                  <p className="text-gray-600 text-sm mb-3">{user.email}</p>
+                  <p className="text-gray-600 text-sm sm:text-base mb-1 truncate">@{user.username || 'unknown'}</p>
+                  <p className="text-gray-600 text-xs sm:text-sm mb-3 truncate">{user.email}</p>
                   
                   {/* Followers/Following Counts */}
                   <div className="flex gap-4 text-sm">
@@ -253,14 +255,14 @@ export default function UserProfile() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 flex gap-2">
+              <div className="mt-4 flex gap-2 min-w-0">
                 {isCurrentUser ? (
                   <Button
                     variant="primary"
                     onClick={() => setIsQRGeneratorOpen(true)}
-                    className="flex-1"
+                    className="flex-1 min-w-0 text-sm sm:text-base"
                   >
-                    📤 Share QR
+                    <span className="whitespace-nowrap">📤 Share QR</span>
                   </Button>
                 ) : (
                   <>
@@ -269,25 +271,25 @@ export default function UserProfile() {
                         variant="outline"
                         onClick={handleUnfollow}
                         disabled={isUnfollowing}
-                        className="flex-1"
+                        className="flex-1 min-w-0 text-sm sm:text-base"
                       >
-                        {isUnfollowing ? 'Unfollowing...' : 'Unfollow'}
+                        <span className="whitespace-nowrap">{isUnfollowing ? 'Unfollowing...' : 'Unfollow'}</span>
                       </Button>
                     ) : (
                       <Button
                         variant="primary"
                         onClick={() => setPresetModalOpen(true)}
-                        className="flex-1"
+                        className="flex-1 min-w-0 text-sm sm:text-base"
                       >
-                        Follow
+                        <span className="whitespace-nowrap">Follow</span>
                       </Button>
                     )}
                     <Button
                       variant="outline"
                       onClick={() => setIsQRScannerOpen(true)}
-                      className="flex-1"
+                      className="flex-1 min-w-0 text-sm sm:text-base"
                     >
-                      📷 Scan QR
+                      <span className="whitespace-nowrap">📷 Scan QR</span>
                     </Button>
                   </>
                 )}

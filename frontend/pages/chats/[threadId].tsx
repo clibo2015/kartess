@@ -252,26 +252,26 @@ export default function ChatView() {
     <Layout title={displayName}>
         <div className="flex flex-col h-screen pb-20 bg-gray-50">
           {/* Header */}
-          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-            <button onClick={() => router.back()} className="text-gray-600">
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 min-w-0">
+            <button onClick={() => router.back()} className="text-gray-600 flex-shrink-0">
               ← Back
             </button>
-            <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
               {otherParticipant?.profile?.avatar_url ? (
                 <Image
                   src={otherParticipant.profile.avatar_url}
                   alt={displayName}
                   width={40}
                   height={40}
-                  className="rounded-full"
+                  className="rounded-full flex-shrink-0"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
                   {displayName.charAt(0)}
                 </div>
               )}
-              <div>
-                <p className="font-semibold text-gray-900">{displayName}</p>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <p className="font-semibold text-gray-900 truncate">{displayName}</p>
                 {typingUsers.size > 0 && (
                   <p className="text-xs text-gray-500">typing...</p>
                 )}
@@ -340,7 +340,14 @@ export default function ChatView() {
           {/* Media Previews */}
           {mediaPreviews.length > 0 && (
             <div className="bg-white border-t border-gray-200 px-4 py-3">
-              <div className="flex gap-2 overflow-x-auto pb-2">
+              <div 
+                className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
                 {mediaPreviews.map((preview, idx) => (
                   <div key={idx} className="relative flex-shrink-0">
                     <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100">
@@ -378,14 +385,14 @@ export default function ChatView() {
 
           {/* Input */}
           <div className="bg-white border-t border-gray-200 px-4 py-3">
-            <div className="flex gap-2 mb-2">
-              <Link href={`/chats/${activeThreadId}/call?type=voice`}>
-                <Button variant="secondary" className="px-3 py-2 text-sm">
+            <div className="flex gap-2 mb-2 min-w-0">
+              <Link href={`/chats/${activeThreadId}/call?type=voice`} className="flex-shrink-0">
+                <Button variant="secondary" className="px-3 py-2 text-sm whitespace-nowrap">
                   📞 Voice
                 </Button>
               </Link>
-              <Link href={`/chats/${activeThreadId}/call?type=video`}>
-                <Button variant="secondary" className="px-3 py-2 text-sm">
+              <Link href={`/chats/${activeThreadId}/call?type=video`} className="flex-shrink-0">
+                <Button variant="secondary" className="px-3 py-2 text-sm whitespace-nowrap">
                   📹 Video
                 </Button>
               </Link>

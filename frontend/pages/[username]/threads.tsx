@@ -205,30 +205,39 @@ export default function ThreadsFeed() {
             </div>
 
             {viewMode === 'discussions' && topicsData?.topics && topicsData.topics.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                <button
-                  onClick={() => setSelectedTopic(null)}
-                  className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${
-                    !selectedTopic
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
+              <div className="relative -mx-4 px-4">
+                <div 
+                  className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                  }}
                 >
-                  All
-                </button>
-                {topicsData.topics.map((topic: any) => (
                   <button
-                    key={topic.name}
-                    onClick={() => setSelectedTopic(topic.name)}
-                    className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${
-                      selectedTopic === topic.name
+                    onClick={() => setSelectedTopic(null)}
+                    className={`flex-shrink-0 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
+                      !selectedTopic
                         ? 'bg-green-600 text-white'
                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                     }`}
                   >
-                    {topic.name} ({topic.count})
+                    All
                   </button>
-                ))}
+                  {topicsData.topics.map((topic: any) => (
+                    <button
+                      key={topic.name}
+                      onClick={() => setSelectedTopic(topic.name)}
+                      className={`flex-shrink-0 px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
+                        selectedTopic === topic.name
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {topic.name} ({topic.count})
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

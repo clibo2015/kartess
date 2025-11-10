@@ -148,29 +148,38 @@ useEffect(() => {
             </div>
 
             {/* Module Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {modules.map((module) => (
-                <button
-                  key={module}
-                  onClick={() => setSelectedModule(module)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${
-                    selectedModule === module
-                      ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {module.charAt(0).toUpperCase() + module.slice(1)}
-                </button>
-              ))}
+            <div className="relative -mx-4 px-4">
+              <div 
+                className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
+                {modules.map((module) => (
+                  <button
+                    key={module}
+                    onClick={() => setSelectedModule(module)}
+                    className={`flex-shrink-0 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap ${
+                      selectedModule === module
+                        ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {module.charAt(0).toUpperCase() + module.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Sort Options */}
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 min-w-0">
               {sortOptions.map((sort) => (
                 <button
                   key={sort}
                   onClick={() => setSortBy(sort)}
-                  className={`px-3 py-1 rounded text-xs font-medium ${
+                  className={`flex-shrink-0 px-2 py-1 sm:px-3 sm:py-1 rounded text-xs font-medium whitespace-nowrap ${
                     sortBy === sort
                       ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -185,7 +194,14 @@ useEffect(() => {
           {/* Stories Section */}
           {stories.length > 0 && (
             <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
-              <div className="flex items-center gap-3 overflow-x-auto pb-2">
+              <div 
+                className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide"
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  scrollbarWidth: 'none',
+                  msOverflowStyle: 'none',
+                }}
+              >
                 {/* Create Story Button */}
                 <button
                   onClick={() => setIsCreateStoryModalOpen(true)}
