@@ -683,7 +683,9 @@ export const liveAPI = {
     token: string;
     channel: string;
     appId: string;
-    uid: string;
+    uid: number; // Numeric UID for Agora
+    userId: string; // String user ID for reference
+    mode: 'live' | 'rtc'; // Client mode
   }> => {
     const response = await api.post('/api/live/create', data);
     return response.data;
@@ -694,7 +696,9 @@ export const liveAPI = {
     token: string;
     channel: string;
     appId: string;
-    uid: string;
+    uid: number; // Numeric UID for Agora
+    userId: string; // String user ID for reference
+    mode: 'live' | 'rtc'; // Client mode
   }> => {
     const response = await api.post(`/api/live/join/${sessionId}`);
     return response.data;

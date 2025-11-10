@@ -6,6 +6,27 @@ const authMiddleware = require('../middleware/auth');
 const router = express.Router();
 
 /**
+ * Convert string user ID to numeric UID for Agora
+ * Agora requires numeric UIDs (0 to 2^32-1)
+ * This function creates a consistent numeric hash from a string
+ */
+function stringToNumericUID(userId) {
+  if (!userId) return 0;
+  
+  // Simple hash function to convert string to number
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    const char = userId.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  // Ensure positive number and within Agora's UID range (0 to 2^32-1)
+  // Use Math.abs and modulo to keep it in range
+  return Math.abs(hash) % 2147483647; // 2^31 - 1 (safe integer range)
+}
+
+/**
  * POST /api/live/create
  * Create a live streaming session
  */
@@ -17,27 +38,48 @@ router.post('/create', authMiddleware, async (req, res) => {
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
     if (!appId || !appCertificate) {
-      console.error('Agora configuration missing - live streaming/calls disabled');
+      const logger = require('../utils/logger');
+      logger.error('Agora configuration missing - live streaming/calls disabled', {
+        hasAppId: !!appId,
+        hasAppCertificate: !!appCertificate,
+      });
       return res.status(503).json({ 
         error: 'Voice/video calls and live streaming are currently unavailable. Please configure Agora credentials.',
-        requiresConfiguration: true 
+        requiresConfiguration: true,
+        details: 'AGORA_APP_ID and AGORA_APP_CERTIFICATE environment variables are required.',
+      });
+    }
+
+    // Validate appId format (should be a valid Agora App ID)
+    if (appId.trim() === '' || appId.length < 10) {
+      const logger = require('../utils/logger');
+      logger.error('Invalid Agora App ID format', { appIdLength: appId.length });
+      return res.status(500).json({
+        error: 'Invalid Agora configuration. Please check your AGORA_APP_ID.',
+        requiresConfiguration: true,
       });
     }
 
     // Generate channel name
     const channelName = `channel_${Date.now()}_${req.user.id}`;
-    const uid = req.user.id; // Use user ID as UID (or 0 for auto-generate)
+    
+    // Convert string user ID to numeric UID for Agora
+    // Agora requires numeric UIDs (0 to 2^32-1)
+    const numericUID = stringToNumericUID(req.user.id);
 
     // Calculate expiration time (24 hours from now)
     const expirationTimeInSeconds = Math.floor(Date.now() / 1000) + 3600 * 24;
 
-    // Build token
+    // Determine role and channel mode based on session type
+    const isLiveStreaming = type === 'live';
     const role = RtcRole.PUBLISHER; // Host can publish and subscribe
+
+    // Build token with numeric UID
     const token = RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCertificate,
       channelName,
-      uid,
+      numericUID,
       role,
       expirationTimeInSeconds
     );
@@ -63,7 +105,9 @@ router.post('/create', authMiddleware, async (req, res) => {
       token,
       channel: channelName,
       appId,
-      uid,
+      uid: numericUID, // Return numeric UID for Agora
+      userId: req.user.id, // Also return string user ID for reference
+      mode: isLiveStreaming ? 'live' : 'rtc', // Indicate client mode
     });
   } catch (error) {
     console.error('Create live session error:', error);
@@ -95,23 +139,40 @@ router.post('/join/:sessionId', authMiddleware, async (req, res) => {
     const appCertificate = process.env.AGORA_APP_CERTIFICATE;
 
     if (!appId || !appCertificate) {
-      console.error('Agora configuration missing - live streaming/calls disabled');
+      const logger = require('../utils/logger');
+      logger.error('Agora configuration missing - live streaming/calls disabled', {
+        hasAppId: !!appId,
+        hasAppCertificate: !!appCertificate,
+      });
       return res.status(503).json({ 
         error: 'Voice/video calls and live streaming are currently unavailable. Please configure Agora credentials.',
-        requiresConfiguration: true 
+        requiresConfiguration: true,
+        details: 'AGORA_APP_ID and AGORA_APP_CERTIFICATE environment variables are required.',
+      });
+    }
+
+    // Validate appId format
+    if (appId.trim() === '' || appId.length < 10) {
+      const logger = require('../utils/logger');
+      logger.error('Invalid Agora App ID format', { appIdLength: appId.length });
+      return res.status(500).json({
+        error: 'Invalid Agora configuration. Please check your AGORA_APP_ID.',
+        requiresConfiguration: true,
       });
     }
 
     // Generate token for viewer (SUBSCRIBER role)
     const expirationTimeInSeconds = Math.floor(Date.now() / 1000) + 3600 * 24;
     const role = RtcRole.SUBSCRIBER; // Viewer can only subscribe
-    const uid = req.user.id;
+    
+    // Convert string user ID to numeric UID for Agora
+    const numericUID = stringToNumericUID(req.user.id);
 
     const token = RtcTokenBuilder.buildTokenWithUid(
       appId,
       appCertificate,
       session.agora_channel,
-      uid,
+      numericUID,
       role,
       expirationTimeInSeconds
     );
@@ -126,11 +187,17 @@ router.post('/join/:sessionId', authMiddleware, async (req, res) => {
       });
     }
 
+    // Determine if this is live streaming or call based on session type
+    const isLiveStreaming = session.type === 'live';
+
     res.json({
       token,
       channel: session.agora_channel,
       appId,
-      uid,
+      uid: numericUID, // Return numeric UID for Agora
+      userId: req.user.id, // Also return string user ID for reference
+      mode: isLiveStreaming ? 'live' : 'rtc', // Indicate client mode
+      session, // Include session data for frontend
     });
   } catch (error) {
     console.error('Join live session error:', error);

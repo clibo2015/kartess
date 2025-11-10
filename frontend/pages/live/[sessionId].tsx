@@ -38,17 +38,19 @@ export default function LiveStreamView() {
           appId: sessionData.appId || '',
           channel: sessionData.channel || '',
           token: sessionData.token || null,
-          uid: sessionData.uid || currentUser?.id || '',
+          uid: sessionData.uid || 0, // Use numeric UID from backend
           role: isHost ? 'host' : 'audience',
           enableVideo: isHost, // Always enable video for live streaming hosts
+          mode: sessionData.mode || 'live', // Use mode from backend (live for streaming)
         }
       : {
           appId: '',
           channel: '',
           token: null,
-          uid: '',
+          uid: 0,
           role: 'audience',
           enableVideo: false,
+          mode: 'live',
         }
   );
 

@@ -4,12 +4,13 @@ interface UseAgoraProps {
   appId: string;
   channel: string;
   token: string | null;
-  uid: string;
+  uid: number | string; // Can be numeric UID or string (will be converted)
   role: 'host' | 'audience';
   enableVideo?: boolean; // Optional: enable video (default: true for host, false for audience)
+  mode?: 'live' | 'rtc'; // Client mode: 'live' for interactive live streaming, 'rtc' for calls
 }
 
-export function useAgora({ appId, channel, token, uid, role, enableVideo = role === 'host' }: UseAgoraProps) {
+export function useAgora({ appId, channel, token, uid, role, enableVideo = role === 'host', mode = 'rtc' }: UseAgoraProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [remoteUsers, setRemoteUsers] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +49,13 @@ export function useAgora({ appId, channel, token, uid, role, enableVideo = role 
         return;
       }
 
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+      // Use 'live' mode for interactive live streaming, 'rtc' for calls
+      // Live mode supports host/audience roles, RTC mode is peer-to-peer
+      const clientMode = mode === 'live' ? 'live' : 'rtc';
+      const client = AgoraRTC.createClient({ mode: clientMode, codec: 'vp8' });
       clientRef.current = client;
+      
+      console.log('Agora client created', { mode: clientMode, appId, channel });
 
       client.on('user-published', async (user: any, mediaType: 'audio' | 'video' | 'datachannel') => {
         await client.subscribe(user, mediaType);
@@ -119,10 +125,39 @@ export function useAgora({ appId, channel, token, uid, role, enableVideo = role 
         }
 
         try {
+          // Validate appId before joining
+          if (!appId || appId.trim() === '') {
+            throw new Error('Agora App ID is missing or invalid. Please check your environment variables.');
+          }
+
+          // Convert UID to number if it's a string
+          const numericUID = typeof uid === 'string' ? parseInt(uid, 10) || 0 : uid;
+          
+          // Validate numeric UID is within Agora's range (0 to 2^32-1)
+          if (numericUID < 0 || numericUID > 4294967295) {
+            throw new Error('Invalid UID: must be between 0 and 4294967295');
+          }
+
           const tokenToUse = token && token.trim() !== '' ? token : null;
-          await client.join(appId, channel, tokenToUse || null, uid);
+          
+          console.log('Joining Agora channel', { appId, channel, uid: numericUID, hasToken: !!tokenToUse, mode: clientMode });
+          
+          await client.join(appId, channel, tokenToUse || null, numericUID);
           
           if (isUnmounted) return;
+          
+          console.log('Successfully joined Agora channel', { channel, uid: numericUID, mode: clientMode });
+          
+          // For live mode, set client role (host can publish, audience can only subscribe)
+          if (clientMode === 'live') {
+            try {
+              await client.setClientRole(role === 'host' ? 'host' : 'audience');
+              console.log('Client role set', { role: role === 'host' ? 'host' : 'audience' });
+            } catch (roleError: any) {
+              console.error('Failed to set client role:', roleError);
+              // Continue even if role setting fails
+            }
+          }
           
           // Create and publish tracks for host
           if (role === 'host') {
@@ -207,7 +242,7 @@ export function useAgora({ appId, channel, token, uid, role, enableVideo = role 
         });
       }
     };
-  }, [appId, channel, token, uid, role, enableVideo]);
+  }, [appId, channel, token, uid, role, enableVideo, mode]);
 
   return {
     isConnected,

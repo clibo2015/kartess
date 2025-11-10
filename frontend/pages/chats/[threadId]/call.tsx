@@ -42,17 +42,19 @@ export default function CallView() {
           appId: sessionData.appId || '',
           channel: sessionData.channel || '',
           token: sessionData.token || null,
-          uid: sessionData.uid || '',
+          uid: sessionData.uid || 0, // Use numeric UID from backend
           role: 'host',
           enableVideo: isVideo, // Enable video only for video calls
+          mode: sessionData.mode || 'rtc', // Use RTC mode for calls
         }
       : {
           appId: '',
           channel: '',
           token: null,
-          uid: '',
+          uid: 0,
           role: 'host',
           enableVideo: isVideo,
+          mode: 'rtc', // RTC mode for calls
         }
   );
 
