@@ -31,6 +31,10 @@ if (process.env.SENTRY_DSN) {
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Trust proxy - REQUIRED for Railway and other cloud platforms
+// This allows Express to correctly identify client IPs behind reverse proxies
+app.set('trust proxy', true);
+
 // Security middleware (must be early in the chain)
 const { enforceHTTPS, requestIdMiddleware, sanitizeError } = require('./middleware/security');
 
