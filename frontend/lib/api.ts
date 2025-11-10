@@ -23,14 +23,15 @@ api.interceptors.request.use(
     // Add CSRF token if available
     // Try to get from localStorage first (set from response headers), then from cookies
     if (typeof window !== 'undefined') {
-      let csrfToken = localStorage.getItem('csrf_token');
+      let csrfToken: string | null = localStorage.getItem('csrf_token');
       
       // Fallback to cookie if not in localStorage
       if (!csrfToken) {
-        csrfToken = document.cookie
+        const cookieToken = document.cookie
           .split('; ')
           .find(row => row.startsWith('csrf_token='))
           ?.split('=')[1];
+        csrfToken = cookieToken || null;
       }
       
       if (csrfToken) {

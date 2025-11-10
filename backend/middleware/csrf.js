@@ -28,8 +28,11 @@ function csrfProtection(req, res, next) {
       path.includes('/api/auth/login') || 
       path.includes('/api/auth/register') ||
       path.includes('/api/auth/verify') ||
-      path.includes('/api/profile/complete')) {
-    // Skip CSRF for profile completion - it's protected by JWT auth and is a one-time onboarding operation
+      path.includes('/api/profile/complete') ||
+      path.includes('/api/qr/generate') ||
+      path.includes('/api/qr/consume')) {
+    // Skip CSRF for JWT-protected endpoints - JWT provides sufficient protection
+    // These endpoints require authentication via authMiddleware
     return next();
   }
 
@@ -52,7 +55,9 @@ function csrfProtection(req, res, next) {
     }
   }
 
-  // Validate token
+  // Validate token - both must be present and match
+  // Note: For JWT-protected endpoints, CSRF is skipped above
+  // This validation only applies to endpoints that require CSRF protection
   if (!token || !cookieToken || token !== cookieToken) {
     return res.status(403).json({ 
       error: 'Invalid CSRF token',
