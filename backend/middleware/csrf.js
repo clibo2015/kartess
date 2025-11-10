@@ -26,7 +26,8 @@ function csrfProtection(req, res, next) {
   const path = req.path || req.originalUrl || '';
   if (path === '/health' || 
       path.includes('/api/auth/login') || 
-      path.includes('/api/auth/register')) {
+      path.includes('/api/auth/register') ||
+      path.includes('/api/auth/verify')) {
     return next();
   }
 
@@ -62,33 +63,27 @@ function csrfProtection(req, res, next) {
 
 /**
  * Generate and set CSRF token (for initial page load)
- * Only sets token if one doesn't exist, or for GET requests
+ * Sets token for all requests to ensure it's available for subsequent requests
  */
 function setCSRFToken(req, res, next) {
-  // Skip for auth endpoints (login/register don't need CSRF tokens initially)
+  // Always set CSRF token (even for auth endpoints) so it's available for subsequent requests
   const path = req.path || req.originalUrl || '';
-  if (path.includes('/api/auth/login') || path.includes('/api/auth/register')) {
-    return next();
-  }
-
-  // Only set token if it doesn't exist or if it's a GET request
   const existingToken = req.cookies?.csrf_token;
   
-  if (!existingToken || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-    const token = existingToken || generateCSRFToken();
-    res.cookie('csrf_token', token, {
-      httpOnly: false, // Must be readable by JavaScript for double-submit
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    });
-    
-    // Also set in response header for easy access
-    res.setHeader('X-CSRF-Token', token);
-  } else {
-    // Use existing token in header
-    res.setHeader('X-CSRF-Token', existingToken);
-  }
+  // Generate new token if one doesn't exist, or reuse existing
+  const token = existingToken || generateCSRFToken();
+  
+  // Set cookie with appropriate settings
+  res.cookie('csrf_token', token, {
+    httpOnly: false, // Must be readable by JavaScript for double-submit
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict', // Use 'lax' in production for cross-origin support
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    path: '/', // Ensure cookie is available for all paths
+  });
+  
+  // Also set in response header for easy access
+  res.setHeader('X-CSRF-Token', token);
   
   next();
 }

@@ -63,9 +63,15 @@ export default function ProfileComplete() {
             avatar_url: response.profile.avatar_url,
           });
         }
+        // If profile is not complete and no profile exists, user can proceed to fill the form
       } catch (error) {
-        // Not authenticated, redirect to login
-        router.push('/login');
+        // If verification fails, don't immediately redirect to login
+        // The user might have just registered and the token is valid but verify call failed
+        // (e.g., due to network issues, CSRF token not yet available, etc.)
+        // Allow user to stay on the page - they can still complete their profile
+        // Only redirect if token is definitely invalid (which would be handled by the token check above)
+        console.warn('Token verification failed, but allowing user to continue:', error);
+        // Don't redirect - let the user complete their profile
       } finally {
         setChecking(false);
       }

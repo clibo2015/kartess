@@ -146,10 +146,22 @@ router.post('/register', async (req, res) => {
       }
     }
 
+    // Check if profile exists and is complete
+    const profile = await prisma.profile.findUnique({
+      where: { user_id: user.id },
+    });
+
+    const profileComplete = Boolean(
+      profile &&
+      profile.bio &&
+      profile.bio.trim().length > 0
+    );
+
     res.status(201).json({
       token,
       refreshToken,
       user,
+      profileComplete, // Include profile completion status
       qrContact, // Include contact info if QR token was consumed
     });
   } catch (error) {
