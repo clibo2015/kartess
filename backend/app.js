@@ -32,8 +32,9 @@ const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Trust proxy - REQUIRED for Railway and other cloud platforms
-// This allows Express to correctly identify client IPs behind reverse proxies
-app.set('trust proxy', true);
+// Set to 1 to trust only Railway's load balancer (first proxy)
+// This is more secure than 'true' and prevents IP spoofing
+app.set('trust proxy', 1);
 
 // Security middleware (must be early in the chain)
 const { enforceHTTPS, requestIdMiddleware, sanitizeError } = require('./middleware/security');
@@ -106,16 +107,27 @@ app.use(cors({
 }));
 
 // Rate limiting
+// Skip trust proxy validation since we're using trust proxy: 1 (safe for Railway)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
+  validate: {
+    trustProxy: false, // Skip validation since we trust only Railway's proxy (trust proxy: 1)
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5, // Limit auth endpoints to 5 requests per 15 minutes
   message: 'Too many authentication attempts, please try again later.',
+  validate: {
+    trustProxy: false, // Skip validation since we trust only Railway's proxy (trust proxy: 1)
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 app.use(limiter);
