@@ -27,7 +27,9 @@ function csrfProtection(req, res, next) {
   if (path === '/health' || 
       path.includes('/api/auth/login') || 
       path.includes('/api/auth/register') ||
-      path.includes('/api/auth/verify')) {
+      path.includes('/api/auth/verify') ||
+      path.includes('/api/profile/complete')) {
+    // Skip CSRF for profile completion - it's protected by JWT auth and is a one-time onboarding operation
     return next();
   }
 

@@ -21,11 +21,17 @@ api.interceptors.request.use(
     }
     
     // Add CSRF token if available
-    if (typeof document !== 'undefined') {
-      const csrfToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrf_token='))
-        ?.split('=')[1];
+    // Try to get from localStorage first (set from response headers), then from cookies
+    if (typeof window !== 'undefined') {
+      let csrfToken = localStorage.getItem('csrf_token');
+      
+      // Fallback to cookie if not in localStorage
+      if (!csrfToken) {
+        csrfToken = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('csrf_token='))
+          ?.split('=')[1];
+      }
       
       if (csrfToken) {
         config.headers['X-CSRF-Token'] = csrfToken;
@@ -66,10 +72,27 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Response interceptor: Handle 401 (unauthorized) with token refresh
+// Response interceptor: Handle 401 (unauthorized) with token refresh and CSRF token storage
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Store CSRF token from response header if available (for cross-domain support)
+    // Axios normalizes headers to lowercase
+    if (typeof window !== 'undefined') {
+      const csrfToken = response.headers['x-csrf-token'] || response.headers['X-CSRF-Token'];
+      if (csrfToken) {
+        localStorage.setItem('csrf_token', csrfToken);
+      }
+    }
+    return response;
+  },
   async (error: AxiosError) => {
+    // Store CSRF token from error response header if available
+    if (typeof window !== 'undefined' && error.response?.headers) {
+      const csrfToken = error.response.headers['x-csrf-token'] || error.response.headers['X-CSRF-Token'];
+      if (csrfToken) {
+        localStorage.setItem('csrf_token', csrfToken);
+      }
+    }
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     // If error is 401 and we haven't tried to refresh yet
