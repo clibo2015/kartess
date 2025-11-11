@@ -154,8 +154,8 @@ export default function LiveStreamView() {
         ))}
 
         {/* Start button - show before connection */}
-        {!shouldStart && sessionData && !isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+        {!shouldStart && sessionData && !isLoading && !error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50">
             <div className="text-center text-white max-w-md mx-4">
               <h2 className="text-2xl font-bold mb-4">
                 {isHost ? 'Ready to Go Live?' : 'Ready to Watch?'}
@@ -170,14 +170,14 @@ export default function LiveStreamView() {
                 onClick={() => {
                   setShouldStart(true);
                 }}
-                className="bg-red-600 px-8 py-3 text-lg"
+                className="bg-red-600 px-8 py-3 text-lg z-10 relative"
               >
                 {isHost ? '🔴 Start Streaming' : '▶️ Watch Stream'}
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => router.back()}
-                className="mt-4 bg-gray-600"
+                className="mt-4 bg-gray-600 z-10 relative"
               >
                 Cancel
               </Button>
@@ -185,9 +185,34 @@ export default function LiveStreamView() {
           </div>
         )}
 
+        {/* Connecting overlay - only show after start button is clicked */}
+        {shouldStart && (isConnecting || (!isConnected && !error)) && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-40">
+            <div className="text-center text-white max-w-md mx-4">
+              <LoadingSpinner size="lg" />
+              <p className="mt-4 text-xl font-semibold">Connecting to stream...</p>
+              <p className="text-sm text-gray-300 mt-2">
+                {isHost 
+                  ? 'Please allow camera and microphone access when prompted by your browser.'
+                  : 'Loading stream...'}
+              </p>
+              {isHost && (
+                <div className="mt-4 p-4 bg-blue-900/50 rounded-lg text-left">
+                  <p className="text-sm font-semibold mb-2">If you don't see a permission prompt:</p>
+                  <ol className="text-xs text-gray-300 list-decimal list-inside space-y-1">
+                    <li>Check your browser's address bar for a camera/microphone icon</li>
+                    <li>Click the lock icon and allow camera/microphone access</li>
+                    <li>Refresh the page and try again</li>
+                  </ol>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Controls overlay */}
         {isConnected && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 z-30">
             <div className="flex items-center justify-center gap-4">
               {isHost && (
                 <Button
@@ -211,32 +236,8 @@ export default function LiveStreamView() {
           </div>
         )}
 
-        {(isConnecting || (!isConnected && !error)) && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="text-center text-white max-w-md mx-4">
-              <LoadingSpinner size="lg" />
-              <p className="mt-4 text-xl font-semibold">Connecting to stream...</p>
-              <p className="text-sm text-gray-300 mt-2">
-                {isHost 
-                  ? 'Please allow camera and microphone access when prompted by your browser.'
-                  : 'Loading stream...'}
-              </p>
-              {isHost && (
-                <div className="mt-4 p-4 bg-blue-900/50 rounded-lg text-left">
-                  <p className="text-sm font-semibold mb-2">If you don't see a permission prompt:</p>
-                  <ol className="text-xs text-gray-300 list-decimal list-inside space-y-1">
-                    <li>Check your browser's address bar for a camera/microphone icon</li>
-                    <li>Click the lock icon and allow camera/microphone access</li>
-                    <li>Refresh the page and try again</li>
-                  </ol>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50">
             <div className="text-center text-white max-w-md mx-4">
               <div className="text-6xl mb-4">⚠️</div>
               <h3 className="text-xl font-bold mb-2">
@@ -248,7 +249,7 @@ export default function LiveStreamView() {
                   <Button
                     variant="primary"
                     onClick={requestPermissions}
-                    className="bg-blue-600"
+                    className="bg-blue-600 z-10 relative"
                   >
                     Grant Permissions
                   </Button>
@@ -256,14 +257,14 @@ export default function LiveStreamView() {
                 <Button
                   variant="primary"
                   onClick={() => window.location.reload()}
-                  className="bg-blue-600"
+                  className="bg-blue-600 z-10 relative"
                 >
                   {needsPermission ? 'Refresh Page' : 'Try Again'}
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={() => router.push('/live')}
-                  className="bg-gray-600"
+                  className="bg-gray-600 z-10 relative"
                 >
                   Go Back
                 </Button>
