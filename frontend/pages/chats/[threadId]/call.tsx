@@ -15,6 +15,7 @@ export default function CallView() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [isInCall, setIsInCall] = useState(false);
+  const [shouldStart, setShouldStart] = useState(false);
 
   const callMode =
     typeof type === 'string'
@@ -37,8 +38,10 @@ export default function CallView() {
     enabled: !!threadId,
   });
 
+  // Only start Daily.co when user clicks the start button
+  // This ensures permission request happens in response to user click
   const { isConnected, isConnecting, error, needsPermission, localVideoTrack, participants, callObject, requestPermissions } = useDaily(
-    sessionData
+    sessionData && shouldStart
       ? {
           roomUrl: sessionData.roomUrl || '',
           token: sessionData.token || null,
@@ -159,30 +162,64 @@ export default function CallView() {
           />
         ))}
 
-        {/* Controls overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              variant="primary"
-              onClick={() => {
-                endCallMutation.mutate();
-                callObject?.leave();
-              }}
-              className="bg-red-600"
-            >
-              End Call
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                callObject?.leave();
-                router.back();
-              }}
-            >
-              Leave
-            </Button>
+        {/* Start button - show before connection */}
+        {!shouldStart && sessionData && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+            <div className="text-center text-white max-w-md mx-4">
+              <h2 className="text-2xl font-bold mb-4">
+                {isVideo ? 'Start Video Call?' : 'Start Voice Call?'}
+              </h2>
+              <p className="text-gray-300 mb-6">
+                {isVideo 
+                  ? 'Click the button below to start the video call. You\'ll be asked to allow camera and microphone access.'
+                  : 'Click the button below to start the voice call. You\'ll be asked to allow microphone access.'}
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShouldStart(true);
+                }}
+                className={`px-8 py-3 text-lg ${isVideo ? 'bg-blue-600' : 'bg-green-600'}`}
+              >
+                {isVideo ? '📹 Start Video Call' : '📞 Start Voice Call'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => router.back()}
+                className="mt-4 bg-gray-600"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Controls overlay */}
+        {isConnected && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  endCallMutation.mutate();
+                  callObject?.leave();
+                }}
+                className="bg-red-600"
+              >
+                End Call
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  callObject?.leave();
+                  router.back();
+                }}
+              >
+                Leave
+              </Button>
+            </div>
+          </div>
+        )}
 
         {(isConnecting || (!isConnected && !error)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">

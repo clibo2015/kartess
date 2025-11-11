@@ -14,6 +14,7 @@ export default function LiveStreamView() {
   const currentUser = getUser();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const [shouldStart, setShouldStart] = useState(false);
 
   const { data: sessionData, isLoading } = useQuery({
     queryKey: ['liveSession', sessionId],
@@ -34,9 +35,10 @@ export default function LiveStreamView() {
   // If sessionId exists, check if current user is the host
   const isHost = !sessionId || sessionData?.session?.host_id === currentUser?.id;
 
-  // Only use Daily.co hook when sessionData is loaded
-  const { isConnected, isConnecting, error, localVideoTrack, participants, callObject } = useDaily(
-    sessionData
+  // Only use Daily.co hook when sessionData is loaded AND user has clicked start
+  // This ensures permission request happens in response to user click
+  const { isConnected, isConnecting, error, needsPermission, localVideoTrack, participants, callObject, requestPermissions } = useDaily(
+    sessionData && shouldStart
       ? {
           roomUrl: sessionData.roomUrl || '',
           token: sessionData.token || null,
@@ -151,29 +153,63 @@ export default function LiveStreamView() {
           />
         ))}
 
-        {/* Controls overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
-          <div className="flex items-center justify-center gap-4">
-            {isHost && (
+        {/* Start button - show before connection */}
+        {!shouldStart && sessionData && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+            <div className="text-center text-white max-w-md mx-4">
+              <h2 className="text-2xl font-bold mb-4">
+                {isHost ? 'Ready to Go Live?' : 'Ready to Watch?'}
+              </h2>
+              <p className="text-gray-300 mb-6">
+                {isHost 
+                  ? 'Click the button below to start your live stream. You\'ll be asked to allow camera and microphone access.'
+                  : 'Click the button below to join the live stream.'}
+              </p>
               <Button
                 variant="primary"
-                onClick={() => endSessionMutation.mutate()}
-                className="bg-red-600"
+                onClick={() => {
+                  setShouldStart(true);
+                }}
+                className="bg-red-600 px-8 py-3 text-lg"
               >
-                End Stream
+                {isHost ? '🔴 Start Streaming' : '▶️ Watch Stream'}
               </Button>
-            )}
-            <Button
-              variant="secondary"
-              onClick={() => {
-                callObject?.leave();
-                router.back();
-              }}
-            >
-              Leave
-            </Button>
+              <Button
+                variant="secondary"
+                onClick={() => router.back()}
+                className="mt-4 bg-gray-600"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Controls overlay */}
+        {isConnected && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+            <div className="flex items-center justify-center gap-4">
+              {isHost && (
+                <Button
+                  variant="primary"
+                  onClick={() => endSessionMutation.mutate()}
+                  className="bg-red-600"
+                >
+                  End Stream
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  callObject?.leave();
+                  router.back();
+                }}
+              >
+                Leave
+              </Button>
+            </div>
+          </div>
+        )}
 
         {(isConnecting || (!isConnected && !error)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
