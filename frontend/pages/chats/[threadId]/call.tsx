@@ -37,7 +37,7 @@ export default function CallView() {
     enabled: !!threadId,
   });
 
-  const { isConnected, isConnecting, error, localVideoTrack, participants, callObject } = useDaily(
+  const { isConnected, isConnecting, error, needsPermission, localVideoTrack, participants, callObject, requestPermissions } = useDaily(
     sessionData
       ? {
           roomUrl: sessionData.roomUrl || '',
@@ -186,12 +186,22 @@ export default function CallView() {
 
         {(isConnecting || (!isConnected && !error)) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="text-center text-white">
+            <div className="text-center text-white max-w-md mx-4">
               <LoadingSpinner size="lg" />
-              <p className="mt-4">Connecting...</p>
+              <p className="mt-4 text-xl font-semibold">Connecting to call...</p>
               <p className="text-sm text-gray-300 mt-2">
-                {isVideo ? 'Please allow camera and microphone access' : 'Please allow microphone access'}
+                {isVideo 
+                  ? 'Please allow camera and microphone access when prompted by your browser.'
+                  : 'Please allow microphone access when prompted by your browser.'}
               </p>
+              <div className="mt-4 p-4 bg-blue-900/50 rounded-lg text-left">
+                <p className="text-sm font-semibold mb-2">If you don't see a permission prompt:</p>
+                <ol className="text-xs text-gray-300 list-decimal list-inside space-y-1">
+                  <li>Check your browser's address bar for a camera/microphone icon</li>
+                  <li>Click the lock icon and allow camera/microphone access</li>
+                  <li>Refresh the page and try again</li>
+                </ol>
+              </div>
             </div>
           </div>
         )}
@@ -200,15 +210,26 @@ export default function CallView() {
           <div className="absolute inset-0 flex items-center justify-center bg-black/80">
             <div className="text-center text-white max-w-md mx-4">
               <div className="text-6xl mb-4">⚠️</div>
-              <h3 className="text-xl font-bold mb-2">Call Error</h3>
+              <h3 className="text-xl font-bold mb-2">
+                {needsPermission ? 'Permissions Required' : 'Call Error'}
+              </h3>
               <p className="text-gray-300 mb-6">{error}</p>
-              <div className="flex gap-4 justify-center">
+              <div className="flex gap-4 justify-center flex-wrap">
+                {needsPermission && (
+                  <Button
+                    variant="primary"
+                    onClick={requestPermissions}
+                    className="bg-blue-600"
+                  >
+                    Grant Permissions
+                  </Button>
+                )}
                 <Button
                   variant="primary"
                   onClick={() => window.location.reload()}
                   className="bg-blue-600"
                 >
-                  Try Again
+                  {needsPermission ? 'Refresh Page' : 'Try Again'}
                 </Button>
                 <Button
                   variant="secondary"
