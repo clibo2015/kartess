@@ -15,6 +15,7 @@ function validateEnv() {
   const optional = {
     FRONTEND_URL: process.env.FRONTEND_URL,
     CLOUDINARY_URL: process.env.CLOUDINARY_URL,
+    DAILY_API_KEY: process.env.DAILY_API_KEY,
     AGORA_APP_ID: process.env.AGORA_APP_ID,
     AGORA_APP_CERTIFICATE: process.env.AGORA_APP_CERTIFICATE,
     SENTRY_DSN: process.env.SENTRY_DSN,

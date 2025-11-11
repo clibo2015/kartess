@@ -373,20 +373,22 @@ model Endorsement {
 
 // Live Streaming/Calls
 model CallSession {
-  id            String   @id @default(cuid())
-  host_id       String   // User hosting the call
-  type          String   @default("live") // 'live', 'call'
-  title         String?
-  description   String?
-  agora_channel String?  // Agora channel name
-  agora_token   String?  // Agora token
-  status        String   @default("scheduled") // 'scheduled', 'active', 'ended'
-  scheduled_at  DateTime?
-  started_at    DateTime?
-  ended_at      DateTime?
-  participants  Json?    // Array of user IDs
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  host_id        String   // User hosting the call
+  type           String   @default("live") // 'live', 'call'
+  title          String?
+  description    String?
+  agora_channel  String?  // Agora channel name (deprecated, kept for rollback)
+  agora_token    String?  // Agora token (deprecated, kept for rollback)
+  daily_room_url String?  // Daily.co room URL
+  daily_token    String?  // Daily.co meeting token
+  status         String   @default("scheduled") // 'scheduled', 'active', 'ended'
+  scheduled_at   DateTime?
+  started_at     DateTime?
+  ended_at       DateTime?
+  participants   Json?    // Array of user IDs
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
   
   @@index([host_id])
   @@index([status])

@@ -680,12 +680,9 @@ export const liveAPI = {
     scheduled_at?: string;
   }): Promise<{
     session: any;
-    token: string;
-    channel: string;
-    appId: string;
-    uid: number; // Numeric UID for Agora
+    roomUrl: string; // Daily.co room URL
+    token: string; // Daily.co meeting token
     userId: string; // String user ID for reference
-    mode: 'live' | 'rtc'; // Client mode
   }> => {
     const response = await api.post('/api/live/create', data);
     return response.data;
@@ -693,12 +690,9 @@ export const liveAPI = {
 
   joinSession: async (sessionId: string): Promise<{
     session?: any;
-    token: string;
-    channel: string;
-    appId: string;
-    uid: number; // Numeric UID for Agora
+    roomUrl: string; // Daily.co room URL
+    token: string; // Daily.co meeting token
     userId: string; // String user ID for reference
-    mode: 'live' | 'rtc'; // Client mode
   }> => {
     const response = await api.post(`/api/live/join/${sessionId}`);
     return response.data;
