@@ -277,6 +277,25 @@ export default function ChatView() {
                 )}
               </div>
             </div>
+            {/* Call Buttons */}
+            {thread.type === '1:1' && (
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => router.push(`/chats/${activeThreadId}/call?type=voice`)}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                  title="Voice Call"
+                >
+                  📞
+                </button>
+                <button
+                  onClick={() => router.push(`/chats/${activeThreadId}/call?type=video`)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                  title="Video Call"
+                >
+                  📹
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Messages */}

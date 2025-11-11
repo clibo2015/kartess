@@ -678,6 +678,7 @@ export const liveAPI = {
     title?: string;
     description?: string;
     scheduled_at?: string;
+    thread_id?: string; // For calls: thread ID to call participants
   }): Promise<{
     session: any;
     roomUrl: string; // Daily.co room URL
@@ -695,6 +696,16 @@ export const liveAPI = {
     userId: string; // String user ID for reference
   }> => {
     const response = await api.post(`/api/live/join/${sessionId}`);
+    return response.data;
+  },
+
+  acceptCall: async (sessionId: string): Promise<{ session: any }> => {
+    const response = await api.post(`/api/live/accept/${sessionId}`);
+    return response.data;
+  },
+
+  rejectCall: async (sessionId: string): Promise<{ session: any }> => {
+    const response = await api.post(`/api/live/reject/${sessionId}`);
     return response.data;
   },
 

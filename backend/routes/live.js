@@ -28,7 +28,7 @@ function stringToNumericUID(userId) {
  */
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { type = 'live', title, description, scheduled_at } = req.body;
+    const { type = 'live', title, description, scheduled_at, thread_id } = req.body;
 
     // Check Daily.co API key
     if (!process.env.DAILY_API_KEY) {
@@ -41,7 +41,10 @@ router.post('/create', authMiddleware, async (req, res) => {
     }
 
     // Determine if this is live streaming or call
+    // type can be: 'live', 'voice', 'video', or 'call'
     const isLiveStreaming = type === 'live';
+    const isCall = type === 'call' || type === 'voice' || type === 'video';
+    const callType = isCall ? (type === 'video' ? 'video' : 'voice') : null;
 
     // Generate room name
     const roomName = `room_${Date.now()}_${req.user.id}`;
@@ -82,21 +85,123 @@ router.post('/create', authMiddleware, async (req, res) => {
       user_name: user?.full_name || user?.username || 'Host',
     });
 
+    // Determine call status
+    let callStatus = null;
+    if (isCall) {
+      callStatus = 'ringing'; // Calls start in ringing state
+    }
+
     // Create call session in database
+    // Store call type as 'call' for database, but track voice/video separately
+    const sessionType = isCall ? 'call' : type;
     const session = await prisma.callSession.create({
       data: {
         host_id: req.user.id,
-        type,
+        type: sessionType,
+        thread_id: thread_id || undefined,
         title: title || undefined,
         description: description || undefined,
         daily_room_url: room.url,
         daily_token: token,
         status: scheduled_at ? 'scheduled' : 'active',
+        call_status: callStatus,
         scheduled_at: scheduled_at ? new Date(scheduled_at) : undefined,
         started_at: scheduled_at ? undefined : new Date(),
         participants: [req.user.id],
+        viewers_count: 0,
       },
     });
+
+    // If this is a call (not live stream), send notification to other participant(s)
+    if (isCall && thread_id) {
+      try {
+        // Get thread participants
+        const thread = await prisma.chatThread.findUnique({
+          where: { id: thread_id },
+        });
+
+        if (thread) {
+          const participants = Array.isArray(thread.participants) ? thread.participants : [];
+          const otherParticipants = participants.filter((id) => id !== req.user.id);
+
+          // Get caller info
+          const caller = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            select: {
+              id: true,
+              username: true,
+              full_name: true,
+              profile: {
+                select: {
+                  avatar_url: true,
+                },
+              },
+            },
+          });
+
+          // Send call notification via Socket.io to each participant
+          const io = req.app.get('io');
+          if (io) {
+            otherParticipants.forEach((participantId) => {
+              // Emit incoming call event with call type
+              io.to(`user:${participantId}`).emit('call.incoming', {
+                sessionId: session.id,
+                threadId: thread_id,
+                caller: caller,
+                type: callType || 'voice', // 'voice' or 'video'
+                roomUrl: room.url,
+              });
+
+              // Create notification in database
+              prisma.notification.create({
+                data: {
+                  user_id: participantId,
+                  sender_id: req.user.id,
+                  type: 'call',
+                  title: 'Incoming Call',
+                  message: `${caller?.full_name || caller?.username} is calling you`,
+                  link: `/chats/${thread_id}/call?sessionId=${session.id}`,
+                },
+              }).catch((err) => {
+                logger.error('Failed to create call notification', { error: err.message });
+              });
+            });
+          }
+        }
+      } catch (error) {
+        logger.error('Failed to send call notifications', { error: error.message });
+        // Don't fail the request if notification fails
+      }
+    }
+
+    // If this is a live stream, emit to all users
+    if (type === 'live') {
+      const io = req.app.get('io');
+      if (io) {
+        // Get host info
+        const host = await prisma.user.findUnique({
+          where: { id: req.user.id },
+          select: {
+            id: true,
+            username: true,
+            full_name: true,
+            profile: {
+              select: {
+                avatar_url: true,
+              },
+            },
+          },
+        });
+
+        // Emit new live stream event
+        io.emit('live.stream.started', {
+          sessionId: session.id,
+          host: host,
+          title: title || 'Live Stream',
+          roomUrl: room.url,
+        });
+      }
+    }
 
     res.json({
       session,
@@ -177,10 +282,28 @@ router.post('/join/:sessionId', authMiddleware, async (req, res) => {
     const participants = Array.isArray(session.participants) ? session.participants : [];
     if (!participants.includes(req.user.id)) {
       participants.push(req.user.id);
+      
+      // Update viewer count for live streams
+      const updateData = { participants };
+      if (session.type === 'live') {
+        updateData.viewers_count = participants.length;
+      }
+      
       await prisma.callSession.update({
         where: { id: sessionId },
-        data: { participants },
+        data: updateData,
       });
+
+      // Emit viewer count update for live streams
+      if (session.type === 'live') {
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`live:${sessionId}`).emit('live.viewers.updated', {
+            sessionId,
+            viewersCount: participants.length,
+          });
+        }
+      }
     }
 
     res.json({
@@ -195,6 +318,132 @@ router.post('/join/:sessionId', authMiddleware, async (req, res) => {
       error: 'Internal server error',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+});
+
+/**
+ * POST /api/live/accept/:sessionId
+ * Accept an incoming call
+ */
+router.post('/accept/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await prisma.callSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (session.type !== 'call') {
+      return res.status(400).json({ error: 'This endpoint is only for calls' });
+    }
+
+    // Check if user is a participant (not the host)
+    const participants = Array.isArray(session.participants) ? session.participants : [];
+    const isHost = session.host_id === req.user.id;
+
+    if (isHost) {
+      return res.status(400).json({ error: 'Host cannot accept their own call' });
+    }
+
+    // Verify user is part of the thread
+    if (session.thread_id) {
+      const thread = await prisma.chatThread.findUnique({
+        where: { id: session.thread_id },
+      });
+      if (thread) {
+        const threadParticipants = Array.isArray(thread.participants) ? thread.participants : [];
+        if (!threadParticipants.includes(req.user.id)) {
+          return res.status(403).json({ error: 'Not authorized to accept this call' });
+        }
+      }
+    }
+
+    // Update call status to accepted
+    const updated = await prisma.callSession.update({
+      where: { id: sessionId },
+      data: {
+        call_status: 'accepted',
+        answered_at: new Date(),
+        status: 'active',
+      },
+    });
+
+    // Notify caller that call was accepted
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${session.host_id}`).emit('call.accepted', {
+        sessionId,
+        acceptedBy: req.user.id,
+      });
+    }
+
+    res.json({ session: updated });
+  } catch (error) {
+    logger.error('Accept call error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/live/reject/:sessionId
+ * Reject an incoming call
+ */
+router.post('/reject/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await prisma.callSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (session.type !== 'call') {
+      return res.status(400).json({ error: 'This endpoint is only for calls' });
+    }
+
+    // Verify user is part of the thread
+    if (session.thread_id) {
+      const thread = await prisma.chatThread.findUnique({
+        where: { id: session.thread_id },
+      });
+      if (thread) {
+        const threadParticipants = Array.isArray(thread.participants) ? thread.participants : [];
+        if (!threadParticipants.includes(req.user.id)) {
+          return res.status(403).json({ error: 'Not authorized to reject this call' });
+        }
+      }
+    }
+
+    // Update call status to rejected
+    const updated = await prisma.callSession.update({
+      where: { id: sessionId },
+      data: {
+        call_status: 'rejected',
+        ended_at: new Date(),
+        status: 'ended',
+      },
+    });
+
+    // Notify caller that call was rejected
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${session.host_id}`).emit('call.rejected', {
+        sessionId,
+        rejectedBy: req.user.id,
+      });
+    }
+
+    res.json({ session: updated });
+  } catch (error) {
+    logger.error('Reject call error', { error: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -282,13 +531,39 @@ router.post('/end/:sessionId', authMiddleware, async (req, res) => {
     }
 
     // Update session status
+    const updateData = {
+      status: 'ended',
+      ended_at: new Date(),
+    };
+    
+    if (session.type === 'call') {
+      updateData.call_status = 'ended';
+    }
+
     const updated = await prisma.callSession.update({
       where: { id: sessionId },
-      data: {
-        status: 'ended',
-        ended_at: new Date(),
-      },
+      data: updateData,
     });
+
+    // Notify all participants that session ended
+    const io = req.app.get('io');
+    if (io) {
+      if (session.type === 'call') {
+        // Notify all participants in the call
+        participants.forEach((participantId) => {
+          io.to(`user:${participantId}`).emit('call.ended', {
+            sessionId,
+            endedBy: req.user.id,
+          });
+        });
+      } else if (session.type === 'live') {
+        // Notify all viewers
+        io.to(`live:${sessionId}`).emit('live.stream.ended', {
+          sessionId,
+          endedBy: req.user.id,
+        });
+      }
+    }
 
     res.json({ session: updated });
   } catch (error) {

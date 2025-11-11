@@ -1,21 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Layout from '../../../components/Layout';
 import { liveAPI } from '../../../lib/api';
 import { getUser } from '../../../lib/auth';
 import { useDaily } from '../../../hooks/useDaily';
+import { getSocket } from '../../../lib/socket';
 import Button from '../../../components/Button';
 import LoadingSpinner from '../../../components/LoadingSpinner';
 
 export default function CallView() {
   const router = useRouter();
-  const { threadId, type } = router.query;
+  const { threadId, type, sessionId } = router.query;
   const currentUser = getUser();
+  const queryClient = useQueryClient();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [isInCall, setIsInCall] = useState(false);
   const [shouldStart, setShouldStart] = useState(false);
+  const [callStatus, setCallStatus] = useState<'ringing' | 'accepted' | 'rejected' | 'ended' | null>(null);
 
   const callMode =
     typeof type === 'string'
@@ -27,16 +30,71 @@ export default function CallView() {
   const isVideo = callMode === 'video';
   const callType = isVideo ? 'video' : 'voice';
 
+  // If sessionId is provided, join existing session (call was accepted)
+  // Otherwise, create new session (initiating call)
   const { data: sessionData, isLoading } = useQuery({
-    queryKey: ['callSession', threadId, type],
+    queryKey: ['callSession', threadId, type, sessionId],
     queryFn: async () => {
-      return liveAPI.createSession({
-        type: callType,
-        title: `Call with thread ${threadId}`,
-      });
+      if (sessionId && typeof sessionId === 'string') {
+        // Joining existing accepted call
+        return liveAPI.joinSession(sessionId);
+      } else {
+        // Creating new call - this will send notification to other participant
+        return liveAPI.createSession({
+          type: callType,
+          title: `Call with thread ${threadId}`,
+          thread_id: threadId as string, // Pass thread_id for call notifications
+        });
+      }
     },
     enabled: !!threadId,
   });
+
+  // Listen for call status updates via Socket.io
+  useEffect(() => {
+    if (!threadId || typeof window === 'undefined') return;
+
+    const socket = getSocket();
+
+    // Listen for call accepted
+    socket.on('call.accepted', (data: any) => {
+      if (sessionData?.session?.id === data.sessionId) {
+        setCallStatus('accepted');
+        // Auto-start the call when accepted
+        if (!shouldStart) {
+          setShouldStart(true);
+        }
+      }
+    });
+
+    // Listen for call rejected
+    socket.on('call.rejected', (data: any) => {
+      if (sessionData?.session?.id === data.sessionId) {
+        setCallStatus('rejected');
+        // Show rejection message and go back
+        setTimeout(() => {
+          router.push(`/chats/${threadId}`);
+        }, 2000);
+      }
+    });
+
+    // Listen for call ended
+    socket.on('call.ended', (data: any) => {
+      if (sessionData?.session?.id === data.sessionId) {
+        setCallStatus('ended');
+        // Navigate back after a delay
+        setTimeout(() => {
+          router.push(`/chats/${threadId}`);
+        }, 1000);
+      }
+    });
+
+    return () => {
+      socket.off('call.accepted');
+      socket.off('call.rejected');
+      socket.off('call.ended');
+    };
+  }, [threadId, sessionData, shouldStart, router]);
 
   // Only start Daily.co when user clicks the start button
   // This ensures permission request happens in response to user click
@@ -166,30 +224,68 @@ export default function CallView() {
         {!shouldStart && sessionData && !isLoading && !error && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50">
             <div className="text-center text-white max-w-md mx-4">
-              <h2 className="text-2xl font-bold mb-4">
-                {isVideo ? 'Start Video Call?' : 'Start Voice Call?'}
-              </h2>
-              <p className="text-gray-300 mb-6">
-                {isVideo 
-                  ? 'Click the button below to start the video call. You\'ll be asked to allow camera and microphone access.'
-                  : 'Click the button below to start the voice call. You\'ll be asked to allow microphone access.'}
-              </p>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setShouldStart(true);
-                }}
-                className={`px-8 py-3 text-lg z-10 relative ${isVideo ? 'bg-blue-600' : 'bg-green-600'}`}
-              >
-                {isVideo ? '📹 Start Video Call' : '📞 Start Voice Call'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => router.back()}
-                className="mt-4 bg-gray-600 z-10 relative"
-              >
-                Cancel
-              </Button>
+              {callStatus === 'ringing' ? (
+                <>
+                  <div className="animate-pulse mb-6">
+                    <div className="text-6xl mb-4">📞</div>
+                  </div>
+                  <h2 className="text-2xl font-bold mb-4">Calling...</h2>
+                  <p className="text-gray-300 mb-6">Waiting for the other party to answer</p>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      if (sessionData?.session?.id) {
+                        liveAPI.endSession(sessionData.session.id);
+                      }
+                      router.back();
+                    }}
+                    className="bg-red-600 z-10 relative"
+                  >
+                    Cancel Call
+                  </Button>
+                </>
+              ) : callStatus === 'rejected' ? (
+                <>
+                  <div className="text-6xl mb-4">❌</div>
+                  <h2 className="text-2xl font-bold mb-4">Call Rejected</h2>
+                  <p className="text-gray-300 mb-6">The other party declined your call</p>
+                  <Button
+                    variant="primary"
+                    onClick={() => router.back()}
+                    className="bg-gray-600 z-10 relative"
+                  >
+                    Go Back
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold mb-4">
+                    {isVideo ? 'Start Video Call?' : 'Start Voice Call?'}
+                  </h2>
+                  <p className="text-gray-300 mb-6">
+                    {isVideo 
+                      ? 'Click the button below to start the video call. You\'ll be asked to allow camera and microphone access.'
+                      : 'Click the button below to start the voice call. You\'ll be asked to allow microphone access.'}
+                  </p>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setShouldStart(true);
+                      setCallStatus('ringing');
+                    }}
+                    className={`px-8 py-3 text-lg z-10 relative ${isVideo ? 'bg-blue-600' : 'bg-green-600'}`}
+                  >
+                    {isVideo ? '📹 Start Video Call' : '📞 Start Voice Call'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.back()}
+                    className="mt-4 bg-gray-600 z-10 relative"
+                  >
+                    Cancel
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}

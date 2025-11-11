@@ -426,6 +426,38 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Join live stream room for real-time updates
+  socket.on('join:live', (sessionId) => {
+    if (!checkSocketRateLimit(socket, 'join:live')) return;
+    socket.join(`live:${sessionId}`);
+    logger.debug('Socket joined live stream room', { socketId: socket.id, sessionId });
+  });
+
+  // Leave live stream room
+  socket.on('leave:live', (sessionId) => {
+    socket.leave(`live:${sessionId}`);
+    logger.debug('Socket left live stream room', { socketId: socket.id, sessionId });
+  });
+
+  // Handle call actions (accept, reject)
+  socket.on('call:accept', async (data) => {
+    if (!socket.userId) {
+      socket.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+    // Call acceptance is handled via API endpoint for security
+    // This is just for real-time notification
+  });
+
+  socket.on('call:reject', async (data) => {
+    if (!socket.userId) {
+      socket.emit('error', { message: 'Unauthorized' });
+      return;
+    }
+    // Call rejection is handled via API endpoint for security
+    // This is just for real-time notification
+  });
+
   socket.on('disconnect', () => {
     logger.debug('User disconnected', { socketId: socket.id });
     rateLimiter.clearSocket(socket.id);

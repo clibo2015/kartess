@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react';
 import '../styles/globals.css';
 import '../styles/masonry.css';
 import { registerServiceWorker, requestNotificationPermission } from '../lib/pushNotifications';
-import { getToken, clearAuth } from '../lib/auth';
+import { getToken, clearAuth, getUser } from '../lib/auth';
 import { authAPI } from '../lib/api';
 import { DarkModeProvider } from '../contexts/DarkModeContext';
+import { getSocket } from '../lib/socket';
+import IncomingCallNotification from '../components/IncomingCallNotification';
 
 // Initialize Sentry for client-side
 if (typeof window !== 'undefined' && process.env.SENTRY_DSN) {
@@ -28,6 +30,10 @@ export default function App({ Component, pageProps }: AppProps) {
         },
       })
   );
+
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [callAccepted, setCallAccepted] = useState(false);
+  const [callRejected, setCallRejected] = useState(false);
 
   useEffect(() => {
     // Validate token on app load - defer to avoid blocking initial render
@@ -86,10 +92,80 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, []);
 
+  // Set up Socket.io for incoming calls
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const currentUser = getUser();
+    if (!currentUser?.id) return;
+
+    const socket = getSocket();
+    
+    // Join user room for notifications
+    socket.emit('join:user', currentUser.id);
+
+    // Listen for incoming calls
+    socket.on('call.incoming', (callData: any) => {
+      setIncomingCall(callData);
+      setCallAccepted(false);
+      setCallRejected(false);
+    });
+
+    // Listen for call accepted
+    socket.on('call.accepted', (data: any) => {
+      if (incomingCall?.sessionId === data.sessionId) {
+        // Call was accepted, can navigate or show message
+        setCallAccepted(true);
+      }
+    });
+
+    // Listen for call rejected
+    socket.on('call.rejected', (data: any) => {
+      if (incomingCall?.sessionId === data.sessionId) {
+        setCallRejected(true);
+        setIncomingCall(null);
+      }
+    });
+
+    // Listen for call ended
+    socket.on('call.ended', (data: any) => {
+      if (incomingCall?.sessionId === data.sessionId) {
+        setIncomingCall(null);
+        setCallAccepted(false);
+        setCallRejected(false);
+      }
+    });
+
+    return () => {
+      socket.off('call.incoming');
+      socket.off('call.accepted');
+      socket.off('call.rejected');
+      socket.off('call.ended');
+    };
+  }, [incomingCall]);
+
+  const handleCallAccept = () => {
+    setIncomingCall(null);
+    setCallAccepted(true);
+  };
+
+  const handleCallReject = () => {
+    setIncomingCall(null);
+    setCallRejected(true);
+  };
+
   return (
     <DarkModeProvider>
       <QueryClientProvider client={queryClient}>
         <Component {...pageProps} />
+        {/* Incoming Call Notification */}
+        {incomingCall && !callAccepted && !callRejected && (
+          <IncomingCallNotification
+            call={incomingCall}
+            onAccept={handleCallAccept}
+            onReject={handleCallReject}
+          />
+        )}
       </QueryClientProvider>
     </DarkModeProvider>
   );

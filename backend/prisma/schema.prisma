@@ -376,6 +376,7 @@ model CallSession {
   id             String   @id @default(cuid())
   host_id        String   // User hosting the call
   type           String   @default("live") // 'live', 'call'
+  thread_id      String?  // Chat thread ID (for calls between users)
   title          String?
   description    String?
   agora_channel  String?  // Agora channel name (deprecated, kept for rollback)
@@ -383,15 +384,20 @@ model CallSession {
   daily_room_url String?  // Daily.co room URL
   daily_token    String?  // Daily.co meeting token
   status         String   @default("scheduled") // 'scheduled', 'active', 'ended'
+  call_status    String?  // For calls: 'ringing', 'accepted', 'rejected', 'ended'
   scheduled_at   DateTime?
   started_at     DateTime?
+  answered_at    DateTime? // When call was answered
   ended_at       DateTime?
   participants   Json?    // Array of user IDs
+  viewers_count  Int      @default(0) // For live streams: current viewer count
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
   
   @@index([host_id])
   @@index([status])
+  @@index([call_status])
+  @@index([thread_id])
   @@index([created_at])
   @@map("call_sessions")
 }

@@ -5,6 +5,7 @@ import Layout from '../../components/Layout';
 import { liveAPI } from '../../lib/api';
 import { getUser } from '../../lib/auth';
 import { useDaily } from '../../hooks/useDaily';
+import { getSocket } from '../../lib/socket';
 import Button from '../../components/Button';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
@@ -15,6 +16,7 @@ export default function LiveStreamView() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [shouldStart, setShouldStart] = useState(false);
+  const [viewersCount, setViewersCount] = useState(0);
 
   const { data: sessionData, isLoading } = useQuery({
     queryKey: ['liveSession', sessionId],
@@ -52,6 +54,42 @@ export default function LiveStreamView() {
           enableAudio: false,
         }
   );
+
+  // Set up Socket.io for real-time viewer count updates
+  useEffect(() => {
+    if (!sessionData?.session?.id || typeof window === 'undefined') return;
+
+    const socket = getSocket();
+    const sessionIdStr = sessionData.session.id;
+
+    // Join live stream room
+    socket.emit('join:live', sessionIdStr);
+
+    // Listen for viewer count updates
+    socket.on('live.viewers.updated', (data: { sessionId: string; viewersCount: number }) => {
+      if (data.sessionId === sessionIdStr) {
+        setViewersCount(data.viewersCount);
+      }
+    });
+
+    // Listen for stream ended
+    socket.on('live.stream.ended', (data: { sessionId: string }) => {
+      if (data.sessionId === sessionIdStr) {
+        router.push('/live');
+      }
+    });
+
+    // Set initial viewer count from session data
+    if (sessionData.session.viewers_count !== undefined) {
+      setViewersCount(sessionData.session.viewers_count);
+    }
+
+    return () => {
+      socket.emit('leave:live', sessionIdStr);
+      socket.off('live.viewers.updated');
+      socket.off('live.stream.ended');
+    };
+  }, [sessionData, router]);
 
   // Render local video track
   useEffect(() => {
