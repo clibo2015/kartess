@@ -39,7 +39,9 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
     const initialize = async () => {
       try {
         // Dynamically import Daily.co SDK
-        const DailyIframe = (await import('@daily-co/daily-js')).default;
+        // TypeScript types are declared in types/daily-js.d.ts
+        const dailyModule = await import('@daily-co/daily-js');
+        const DailyIframe = dailyModule.default || (dailyModule as any).DailyIframe || dailyModule;
 
         if (isUnmounted) {
           return;
@@ -170,10 +172,12 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
               // Remote tracks
               setParticipants((prev) => {
                 const updated = new Map(prev);
-                const existing = updated.get(participant.session_id) || {
+                const existing: DailyParticipant = updated.get(participant.session_id) || {
                   session_id: participant.session_id,
                   user_name: participant.user_name,
                   local: false,
+                  videoTrack: null,
+                  audioTrack: null,
                 };
                 
                 if (track.kind === 'video') {
@@ -209,7 +213,7 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
               // Remote tracks
               setParticipants((prev) => {
                 const updated = new Map(prev);
-                const existing = updated.get(participant.session_id);
+                const existing: DailyParticipant | undefined = updated.get(participant.session_id);
                 if (existing) {
                   if (track.kind === 'video') {
                     existing.videoTrack = null;
