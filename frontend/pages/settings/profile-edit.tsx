@@ -291,41 +291,43 @@ export default function ProfileEdit() {
               </FormField>
             </div>
 
-            <FormField label="Avatar" error={errors.avatar} className="mt-4">
-              <div className="space-y-2">
-                {formData.avatar_url && (
-                  <div className="mb-2">
-                    <img
-                      src={formData.avatar_url}
-                      alt="Avatar preview"
-                      className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
-                    />
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                />
-                {formData.avatar && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={handleAvatarUpload}
-                      loading={uploading}
-                      className="text-sm"
-                    >
-                      Upload Avatar
-                    </Button>
-                    <span className="text-sm text-gray-600">
-                      {formData.avatar.name}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </FormField>
+            <div className="mt-4">
+              <FormField label="Avatar" error={errors.avatar}>
+                <div className="space-y-2">
+                  {formData.avatar_url && (
+                    <div className="mb-2">
+                      <img
+                        src={formData.avatar_url}
+                        alt="Avatar preview"
+                        className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  {formData.avatar && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleAvatarUpload}
+                        loading={uploading}
+                        className="text-sm"
+                      >
+                        Upload Avatar
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        {formData.avatar.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </FormField>
+            </div>
 
             <div className="flex gap-3 mt-6">
               <Button
