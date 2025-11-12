@@ -319,19 +319,32 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
             // Update tracks from event
             const { participant, track } = event;
             if (!participant || !track) {
+              console.warn('Track started event missing participant or track', event);
               updateParticipantsFromState();
               return;
             }
             
+            console.log('Track started details:', {
+              isLocal: participant.local,
+              trackKind: track.kind,
+              sessionId: participant.session_id,
+              trackId: track.id,
+              trackEnabled: track.enabled,
+              trackReadyState: track.readyState,
+            });
+            
             if (participant.local) {
               // Local tracks
               if (track.kind === 'video') {
+                console.log('Setting local video track');
                 setLocalVideoTrack(track);
               } else if (track.kind === 'audio') {
+                console.log('Setting local audio track');
                 setLocalAudioTrack(track);
               }
             } else {
-              // Remote tracks
+              // Remote tracks - ensure we update participants state
+              console.log('Setting remote track for participant:', participant.session_id);
               setParticipants((prev) => {
                 const updated = new Map(prev);
                 const existing: DailyParticipant = updated.get(participant.session_id) || {
@@ -344,8 +357,10 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
                 
                 if (track.kind === 'video') {
                   existing.videoTrack = track;
+                  console.log('Remote video track set for', participant.session_id);
                 } else if (track.kind === 'audio') {
                   existing.audioTrack = track;
+                  console.log('Remote audio track set for', participant.session_id);
                 }
                 
                 updated.set(participant.session_id, existing);
@@ -454,17 +469,38 @@ export function useDaily({ roomUrl, token, enableVideo = true, enableAudio = tru
         // Set media settings after joining
         // These settings control whether the user's camera/mic are enabled
         // We've already requested permissions, so this should work
+        // IMPORTANT: For calls, both participants need to publish their tracks
         if (enableAudio !== undefined) {
           console.log('useDaily: Setting local audio to:', enableAudio);
-          await callObject.setLocalAudio(enableAudio);
-          console.log('useDaily: Local audio set successfully');
+          try {
+            await callObject.setLocalAudio(enableAudio);
+            console.log('useDaily: Local audio set successfully');
+            // Verify audio is actually enabled
+            const audioEnabled = await callObject.localAudio();
+            console.log('useDaily: Local audio enabled state:', audioEnabled);
+          } catch (audioError) {
+            console.error('useDaily: Failed to set local audio', audioError);
+          }
         }
         
         if (enableVideo !== undefined) {
           console.log('useDaily: Setting local video to:', enableVideo);
-          await callObject.setLocalVideo(enableVideo);
-          console.log('useDaily: Local video set successfully');
+          try {
+            await callObject.setLocalVideo(enableVideo);
+            console.log('useDaily: Local video set successfully');
+            // Verify video is actually enabled
+            const videoEnabled = await callObject.localVideo();
+            console.log('useDaily: Local video enabled state:', videoEnabled);
+          } catch (videoError) {
+            console.error('useDaily: Failed to set local video', videoError);
+          }
         }
+        
+        // Force update participants state after setting media
+        // This ensures we capture any tracks that were already available
+        setTimeout(() => {
+          updateParticipantsFromState();
+        }, 500);
         
         console.log('useDaily: Initialization complete');
       } catch (error: any) {

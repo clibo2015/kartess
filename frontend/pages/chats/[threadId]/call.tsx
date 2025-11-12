@@ -16,6 +16,7 @@ export default function CallView() {
   const queryClient = useQueryClient();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const [isInCall, setIsInCall] = useState(false);
   const [shouldStart, setShouldStart] = useState(false);
   const [callStatus, setCallStatus] = useState<'ringing' | 'accepted' | 'rejected' | 'ended' | null>(null);
@@ -147,39 +148,104 @@ export default function CallView() {
       if (participant.videoTrack) {
         const videoElement = remoteVideoRefs.current.get(participant.session_id);
         if (videoElement) {
+          // Create a new MediaStream with the track
           const stream = new MediaStream([participant.videoTrack]);
-          videoElement.srcObject = stream;
-          videoElement.play().catch((err) => {
-            console.error('Failed to play remote video', err);
-          });
+          
+          // Only update if the srcObject is different to avoid unnecessary re-renders
+          if (videoElement.srcObject !== stream) {
+            videoElement.srcObject = stream;
+            videoElement.play().catch((err) => {
+              console.error('Failed to play remote video', err);
+            });
+          }
+        }
+      } else {
+        // Clear video element if track is gone
+        const videoElement = remoteVideoRefs.current.get(participant.session_id);
+        if (videoElement) {
+          videoElement.srcObject = null;
         }
       }
     });
   }, [participants, isVideo]);
 
-  // Play remote audio tracks
+  // Play remote audio tracks - properly managed with refs
   useEffect(() => {
     participants.forEach((participant) => {
       if (participant.audioTrack) {
-        const audioElement = document.createElement('audio');
-        audioElement.autoplay = true;
+        let audioElement = remoteAudioRefs.current.get(participant.session_id);
+        
+        // Create audio element if it doesn't exist
+        if (!audioElement) {
+          audioElement = document.createElement('audio');
+          audioElement.autoplay = true;
+          audioElement.playsInline = true;
+          audioElement.volume = 1.0;
+          // Hide audio element
+          audioElement.style.display = 'none';
+          document.body.appendChild(audioElement);
+          remoteAudioRefs.current.set(participant.session_id, audioElement);
+        }
+
+        // Attach track to audio element
         const stream = new MediaStream([participant.audioTrack]);
         audioElement.srcObject = stream;
         audioElement.play().catch((err) => {
           console.error('Failed to play remote audio', err);
         });
-
-        // Clean up when track stops
-        participant.audioTrack.addEventListener('ended', () => {
+      } else {
+        // Remove audio element if track is gone
+        const audioElement = remoteAudioRefs.current.get(participant.session_id);
+        if (audioElement) {
+          audioElement.srcObject = null;
           audioElement.remove();
-        });
+          remoteAudioRefs.current.delete(participant.session_id);
+        }
       }
     });
+
+    // Clean up audio elements for participants that left
+    const currentParticipantIds = new Set(participants.map(p => p.session_id));
+    remoteAudioRefs.current.forEach((audioElement, sessionId) => {
+      if (!currentParticipantIds.has(sessionId)) {
+        audioElement.srcObject = null;
+        audioElement.remove();
+        remoteAudioRefs.current.delete(sessionId);
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      remoteAudioRefs.current.forEach((audioElement) => {
+        audioElement.srcObject = null;
+        audioElement.remove();
+      });
+      remoteAudioRefs.current.clear();
+    };
   }, [participants]);
 
   useEffect(() => {
     setIsInCall(isConnected);
   }, [isConnected]);
+
+  // Cleanup audio/video elements on unmount
+  useEffect(() => {
+    return () => {
+      // Clean up all remote video elements
+      remoteVideoRefs.current.forEach((videoElement) => {
+        videoElement.srcObject = null;
+        videoElement.remove();
+      });
+      remoteVideoRefs.current.clear();
+
+      // Clean up all remote audio elements
+      remoteAudioRefs.current.forEach((audioElement) => {
+        audioElement.srcObject = null;
+        audioElement.remove();
+      });
+      remoteAudioRefs.current.clear();
+    };
+  }, []);
 
   const endCallMutation = useMutation({
     mutationFn: () => liveAPI.endSession(sessionData?.session?.id || ''),
@@ -213,21 +279,34 @@ export default function CallView() {
         )}
 
         {/* Remote participants video */}
-        {isVideo && participants.map((participant) => (
-          <video
-            key={participant.session_id}
-            ref={(el) => {
-              if (el) {
-                remoteVideoRefs.current.set(participant.session_id, el);
-              } else {
-                remoteVideoRefs.current.delete(participant.session_id);
-              }
-            }}
-            className="w-full h-screen object-cover"
-            autoPlay
-            playsInline
-          />
-        ))}
+        {isVideo && participants.map((participant) => {
+          // Only render if participant has a video track
+          if (!participant.videoTrack) return null;
+          
+          return (
+            <video
+              key={participant.session_id}
+              ref={(el) => {
+                if (el) {
+                  remoteVideoRefs.current.set(participant.session_id, el);
+                  // Attach track immediately when element is mounted
+                  if (participant.videoTrack) {
+                    const stream = new MediaStream([participant.videoTrack]);
+                    el.srcObject = stream;
+                    el.play().catch((err) => {
+                      console.error('Failed to play remote video on mount', err);
+                    });
+                  }
+                } else {
+                  remoteVideoRefs.current.delete(participant.session_id);
+                }
+              }}
+              className="w-full h-screen object-cover absolute inset-0"
+              autoPlay
+              playsInline
+            />
+          );
+        })}
 
         {/* Start button - show before connection */}
         {!shouldStart && sessionData && !isLoading && !error && (
