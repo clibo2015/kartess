@@ -15,7 +15,8 @@ export default function NotificationsBell({ onClick }: NotificationsBellProps) {
   const { data, refetch } = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: () => notificationsAPI.getNotifications({ unread_only: true, limit: 1 }),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: false, // Disable automatic refetch - rely on Socket.io for real-time updates
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
   });
 
   const unreadCount = data?.unreadCount || 0;
@@ -27,16 +28,19 @@ export default function NotificationsBell({ onClick }: NotificationsBellProps) {
     const socketInstance = getSocket();
     setSocket(socketInstance);
 
-    // Join user room
+    // Join user room for real-time notifications
     socketInstance.emit('join:user', currentUser.id);
 
-    // Listen for new notifications
-    socketInstance.on('notification.new', () => {
+    // Listen for new notifications - refetch immediately when notification arrives
+    const handleNotification = () => {
+      // Immediately refetch unread count when new notification arrives
       refetch();
-    });
+    };
+
+    socketInstance.on('notification.new', handleNotification);
 
     return () => {
-      socketInstance.off('notification.new');
+      socketInstance.off('notification.new', handleNotification);
     };
   }, [currentUser?.id, refetch]);
 

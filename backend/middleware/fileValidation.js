@@ -97,7 +97,7 @@ async function validateFileSignature(buffer, allowedMimeTypes) {
 /**
  * Validate file size
  */
-function validateFileSize(size, maxSize = 10 * 1024 * 1024) { // 10MB default
+function validateFileSize(size, maxSize = 50 * 1024 * 1024) { // 50MB default
   if (size > maxSize) {
     return { 
       valid: false, 

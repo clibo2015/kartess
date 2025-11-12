@@ -97,8 +97,8 @@ export default function ProfileComplete() {
         setErrors({ avatar: 'Please select an image file' });
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors({ avatar: 'File size must be less than 10MB' });
+      if (file.size > 50 * 1024 * 1024) {
+        setErrors({ avatar: 'File size must be less than 50MB' });
         return;
       }
       setFormData((prev) => ({ ...prev, avatar: file }));

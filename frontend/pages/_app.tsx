@@ -21,11 +21,13 @@ export default function App({ Component, pageProps }: AppProps) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 60 * 1000, // 5 minutes - increased to reduce refetches
+            staleTime: 5 * 60 * 1000, // 5 minutes - data considered fresh for 5 minutes
             gcTime: 10 * 60 * 1000, // 10 minutes garbage collection time (formerly cacheTime)
-            refetchOnWindowFocus: false,
+            refetchOnWindowFocus: false, // Don't refetch when window regains focus
             refetchOnMount: false, // Don't refetch on mount if data is fresh
+            refetchOnReconnect: false, // Don't refetch on reconnect - rely on Socket.io for real-time updates
             retry: 1, // Only retry once on failure
+            networkMode: 'online', // Only run queries when online
           },
         },
       })
@@ -92,7 +94,7 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, []);
 
-  // Set up Socket.io for incoming calls
+  // Set up Socket.io for incoming calls and notifications
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -101,57 +103,71 @@ export default function App({ Component, pageProps }: AppProps) {
 
     const socket = getSocket();
     
-    // Join user room for notifications
+    // Join user room for notifications and calls
     socket.emit('join:user', currentUser.id);
 
     // Listen for incoming calls
-    socket.on('call.incoming', (callData: any) => {
+    const handleCallIncoming = (callData: any) => {
       setIncomingCall(callData);
       setCallAccepted(false);
       setCallRejected(false);
-    });
+    };
 
     // Listen for call accepted
-    socket.on('call.accepted', (data: any) => {
-      if (incomingCall?.sessionId === data.sessionId) {
-        // Call was accepted, can navigate or show message
-        setCallAccepted(true);
-      }
-    });
+    const handleCallAccepted = (data: any) => {
+      setIncomingCall((prev: any) => {
+        if (prev?.sessionId === data.sessionId) {
+          setCallAccepted(true);
+          return prev;
+        }
+        return prev;
+      });
+    };
 
     // Listen for call rejected
-    socket.on('call.rejected', (data: any) => {
-      if (incomingCall?.sessionId === data.sessionId) {
-        setCallRejected(true);
-        setIncomingCall(null);
-      }
-    });
+    const handleCallRejected = (data: any) => {
+      setIncomingCall((prev: any) => {
+        if (prev?.sessionId === data.sessionId) {
+          setCallRejected(true);
+          return null;
+        }
+        return prev;
+      });
+    };
 
     // Listen for call ended
-    socket.on('call.ended', (data: any) => {
-      if (incomingCall?.sessionId === data.sessionId) {
-        setIncomingCall(null);
-        setCallAccepted(false);
-        setCallRejected(false);
-      }
-    });
+    const handleCallEnded = (data: any) => {
+      setIncomingCall((prev: any) => {
+        if (prev?.sessionId === data.sessionId) {
+          setCallAccepted(false);
+          setCallRejected(false);
+          return null;
+        }
+        return prev;
+      });
+    };
 
     // Listen for live stream started (from contacts)
-    socket.on('live.stream.started', (data: any) => {
+    const handleLiveStreamStarted = (data: any) => {
       // Show notification or update UI when a contact starts a live stream
       console.log('Live stream started:', data);
-      // You can add a notification here if needed
-      // For now, we'll just log it - the notification system should handle this
-    });
+      // The notification system should handle this via Socket.io
+    };
+
+    socket.on('call.incoming', handleCallIncoming);
+    socket.on('call.accepted', handleCallAccepted);
+    socket.on('call.rejected', handleCallRejected);
+    socket.on('call.ended', handleCallEnded);
+    socket.on('live.stream.started', handleLiveStreamStarted);
 
     return () => {
-      socket.off('call.incoming');
-      socket.off('call.accepted');
-      socket.off('call.rejected');
-      socket.off('call.ended');
-      socket.off('live.stream.started');
+      socket.off('call.incoming', handleCallIncoming);
+      socket.off('call.accepted', handleCallAccepted);
+      socket.off('call.rejected', handleCallRejected);
+      socket.off('call.ended', handleCallEnded);
+      socket.off('live.stream.started', handleLiveStreamStarted);
     };
-  }, [incomingCall]);
+  }, []); // Remove incomingCall from dependencies to avoid re-subscribing
 
   const handleCallAccept = () => {
     setIncomingCall(null);

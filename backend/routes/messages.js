@@ -25,7 +25,7 @@ if (process.env.CLOUDINARY_URL) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 50 * 1024 * 1024, // 50MB
   },
   fileFilter: (req, file, cb) => {
     if (
@@ -87,7 +87,7 @@ router.post(
       
       const uploadPromises = req.files.map(async (file) => {
         // Validate file size
-        const sizeCheck = validateFileSize(file.size, 10 * 1024 * 1024);
+        const sizeCheck = validateFileSize(file.size, 50 * 1024 * 1024);
         if (!sizeCheck.valid) {
           throw new Error(sizeCheck.error);
         }

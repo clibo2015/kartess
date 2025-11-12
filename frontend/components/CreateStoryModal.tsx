@@ -26,12 +26,12 @@ export default function CreateStoryModal({
     if (!file) return;
 
     // Validate file
-    const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
+    const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB
     const isValidType =
       file.type.startsWith('image/') || file.type.startsWith('video/');
     
     if (!isValidSize) {
-      alert('File size must be less than 10MB');
+      alert('File size must be less than 50MB');
       return;
     }
     
@@ -149,7 +149,7 @@ export default function CreateStoryModal({
                     <div className="text-center">
                       <span className="text-4xl mb-2 block">📸</span>
                       <p className="text-gray-600">Tap to select photo or video</p>
-                      <p className="text-sm text-gray-400 mt-1">Max 10MB</p>
+                      <p className="text-sm text-gray-400 mt-1">Max 50MB</p>
                     </div>
                   </div>
                 )}

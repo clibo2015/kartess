@@ -66,11 +66,18 @@ export default function ProfileEdit() {
         }
       } catch (error: any) {
         console.error('Failed to load profile:', error);
-        setToast({
-          message: 'Failed to load profile. Please try again.',
-          type: 'error',
-          isVisible: true,
-        });
+        // If profile doesn't exist (404), allow user to create one
+        // The form will be empty, and submitting will create the profile
+        if (error.response?.status === 404) {
+          console.log('Profile does not exist, allowing user to create one');
+          // Don't show error - just allow user to fill in the form
+        } else {
+          setToast({
+            message: 'Failed to load profile. Please try again.',
+            type: 'error',
+            isVisible: true,
+          });
+        }
       } finally {
         setFetching(false);
       }
@@ -96,8 +103,8 @@ export default function ProfileEdit() {
         setErrors({ avatar: 'Please select an image file' });
         return;
       }
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors({ avatar: 'File size must be less than 10MB' });
+      if (file.size > 50 * 1024 * 1024) {
+        setErrors({ avatar: 'File size must be less than 50MB' });
         return;
       }
       setFormData((prev) => ({ ...prev, avatar: file }));

@@ -23,7 +23,7 @@ if (process.env.CLOUDINARY_URL) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 50 * 1024 * 1024, // 50MB
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
@@ -68,7 +68,7 @@ router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
     }
 
     // Validate file size
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 50 * 1024 * 1024; // 50MB
     if (req.file.size > maxSize) {
       return res.status(400).json({ 
         error: `File size exceeds limit of ${maxSize / (1024 * 1024)}MB`,

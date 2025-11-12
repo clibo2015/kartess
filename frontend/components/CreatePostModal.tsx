@@ -75,7 +75,7 @@ export default function CreatePostModal({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles = files.filter((file) => {
-      const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
+      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB
       const isValidType =
         file.type.startsWith('image/') || file.type.startsWith('video/');
       return isValidSize && isValidType;
@@ -363,7 +363,7 @@ export default function CreatePostModal({
               onClick={() => fileInputRef.current?.click()}
               className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
-              📎 Add Media (max 10MB each)
+              📎 Add Media (max 50MB each)
             </button>
           </div>
 

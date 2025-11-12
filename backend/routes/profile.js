@@ -25,7 +25,7 @@ if (process.env.CLOUDINARY_URL) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: 50 * 1024 * 1024, // 50MB
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -105,7 +105,7 @@ router.post(
       // Validate file before upload
       const { validateFileSignature, validateFileSize } = require('../middleware/fileValidation');
       
-      const sizeCheck = validateFileSize(req.file.size, 5 * 1024 * 1024); // 5MB for avatars
+      const sizeCheck = validateFileSize(req.file.size, 50 * 1024 * 1024); // 50MB for avatars
       if (!sizeCheck.valid) {
         return res.status(400).json({ error: sizeCheck.error });
       }
@@ -150,15 +150,17 @@ router.put('/', authMiddleware, async (req, res) => {
     // Allow partial updates - only validate fields that are provided
     const updateData = {};
     if (req.body.bio !== undefined) {
-      if (req.body.bio.length < 10 && req.body.bio.length > 0) {
-        return res.status(400).json({ error: 'Bio must be at least 10 characters' });
+      // Allow empty bio or bio with at least 10 characters
+      const bioValue = req.body.bio?.trim() || '';
+      if (bioValue.length > 0 && bioValue.length < 10) {
+        return res.status(400).json({ error: 'Bio must be at least 10 characters if provided' });
       }
-      updateData.bio = req.body.bio || null;
+      updateData.bio = bioValue || null;
     }
-    if (req.body.company !== undefined) updateData.company = req.body.company || null;
-    if (req.body.position !== undefined) updateData.position = req.body.position || null;
-    if (req.body.phone !== undefined) updateData.phone = req.body.phone || null;
-    if (req.body.education !== undefined) updateData.education = req.body.education || null;
+    if (req.body.company !== undefined) updateData.company = req.body.company?.trim() || null;
+    if (req.body.position !== undefined) updateData.position = req.body.position?.trim() || null;
+    if (req.body.phone !== undefined) updateData.phone = req.body.phone?.trim() || null;
+    if (req.body.education !== undefined) updateData.education = req.body.education?.trim() || null;
     if (req.body.avatar_url !== undefined) updateData.avatar_url = req.body.avatar_url || null;
 
     // Get user to access username for handles generation (if needed)

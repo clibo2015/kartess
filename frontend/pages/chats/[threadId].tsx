@@ -56,7 +56,8 @@ export default function ChatView() {
     queryKey: ['messages', activeThreadId],
     queryFn: () => chatsAPI.getMessages(activeThreadId as string, { limit: 50 }),
     enabled: !!activeThreadId,
-    refetchInterval: false,
+    refetchInterval: false, // Disable automatic refetch - rely on Socket.io for real-time updates
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   });
 
   const messages = messagesData?.messages || [];
@@ -71,17 +72,25 @@ export default function ChatView() {
     // Join thread
     socketInstance.emit('join:thread', activeThreadId);
 
-    // Listen for new messages
-    socketInstance.on('message.new', (newMessage: any) => {
-      queryClient.setQueryData(['messages', activeThreadId], (old: any) => {
-        if (!old) return { messages: [newMessage], nextCursor: null };
-        return {
-          ...old,
-          messages: [...old.messages, newMessage],
-        };
-      });
-      scrollToBottom();
-    });
+    // Listen for new messages - update cache immediately for real-time updates
+    const handleNewMessage = (newMessage: any) => {
+      // Only update if message is for current thread
+      if (newMessage.thread_id === activeThreadId) {
+        queryClient.setQueryData(['messages', activeThreadId], (old: any) => {
+          if (!old) return { messages: [newMessage], nextCursor: null };
+          // Check if message already exists to avoid duplicates
+          const messageExists = old.messages.some((msg: any) => msg.id === newMessage.id);
+          if (messageExists) return old;
+          return {
+            ...old,
+            messages: [...old.messages, newMessage],
+          };
+        });
+        scrollToBottom();
+      }
+    };
+
+    socketInstance.on('message.new', handleNewMessage);
 
     // Listen for typing indicators
     socketInstance.on('thread:typing', (data: { user_id: string; typing: boolean }) => {
@@ -135,7 +144,7 @@ export default function ChatView() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles = files.filter((file) => {
-      const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB
+      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB
       const isValidType =
         file.type.startsWith('image/') ||
         file.type.startsWith('video/') ||
@@ -144,7 +153,7 @@ export default function ChatView() {
     });
 
     if (validFiles.length !== files.length) {
-      alert('Some files were invalid. Only images, videos, and audio files under 10MB are allowed.');
+        alert('Some files were invalid. Only images, videos, and audio files under 50MB are allowed.');
     }
 
     setMediaFiles((prev) => [...prev, ...validFiles]);
