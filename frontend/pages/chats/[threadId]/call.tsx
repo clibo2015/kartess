@@ -179,7 +179,6 @@ export default function CallView() {
         if (!audioElement) {
           audioElement = document.createElement('audio');
           audioElement.autoplay = true;
-          audioElement.playsInline = true;
           audioElement.volume = 1.0;
           // Hide audio element
           audioElement.style.display = 'none';
