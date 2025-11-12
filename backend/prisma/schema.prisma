@@ -379,6 +379,7 @@ model CallSession {
   thread_id      String?  // Chat thread ID (for calls between users)
   title          String?
   description    String?
+  category       String?  // For live streams: 'Gaming', 'Music', 'Art & Creative', 'Technology', 'Education', 'Lifestyle', 'Other'
   agora_channel  String?  // Agora channel name (deprecated, kept for rollback)
   agora_token    String?  // Agora token (deprecated, kept for rollback)
   daily_room_url String?  // Daily.co room URL
@@ -398,6 +399,7 @@ model CallSession {
   @@index([status])
   @@index([call_status])
   @@index([thread_id])
+  @@index([category])
   @@index([created_at])
   @@map("call_sessions")
 }

@@ -193,7 +193,7 @@ export default function UserProfile() {
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/settings')}
+                  onClick={() => router.push('/settings/profile-edit')}
                   className="bg-black text-white border-black hover:bg-gray-800 flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base px-3 sm:px-4"
                 >
                   <span>✏️</span>

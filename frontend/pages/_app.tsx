@@ -136,11 +136,20 @@ export default function App({ Component, pageProps }: AppProps) {
       }
     });
 
+    // Listen for live stream started (from contacts)
+    socket.on('live.stream.started', (data: any) => {
+      // Show notification or update UI when a contact starts a live stream
+      console.log('Live stream started:', data);
+      // You can add a notification here if needed
+      // For now, we'll just log it - the notification system should handle this
+    });
+
     return () => {
       socket.off('call.incoming');
       socket.off('call.accepted');
       socket.off('call.rejected');
       socket.off('call.ended');
+      socket.off('live.stream.started');
     };
   }, [incomingCall]);
 

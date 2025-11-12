@@ -397,6 +397,28 @@ router.get('/timeline', authMiddleware, async (req, res) => {
             },
           },
         },
+        parent: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                full_name: true,
+                profile: {
+                  select: {
+                    avatar_url: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                reactions: true,
+                comments: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             reactions: true,
@@ -538,6 +560,28 @@ router.get('/module/:module', authMiddleware, async (req, res) => {
             profile: {
               select: {
                 avatar_url: true,
+              },
+            },
+          },
+        },
+        parent: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                full_name: true,
+                profile: {
+                  select: {
+                    avatar_url: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                reactions: true,
+                comments: true,
               },
             },
           },
@@ -812,14 +856,18 @@ router.post('/:postId/repost', authMiddleware, async (req, res) => {
     }
 
     // Create repost with parent_id
+    // For reposts, we don't copy media_urls to the repost itself
+    // Instead, we reference the parent post which contains the original content
     const repost = await prisma.post.create({
       data: {
         user_id: req.user.id,
-        content: content || '',
+        content: content || '', // Optional comment from reposter
         module: module || originalPost.module,
         visibility: 'public',
+        network_type: originalPost.network_type || 'both',
         parent_id: postId,
-        media_urls: originalPost.media_urls,
+        // Don't copy media_urls - they're in the parent post
+        tags: originalPost.tags,
       },
       include: {
         user: {
@@ -830,6 +878,28 @@ router.post('/:postId/repost', authMiddleware, async (req, res) => {
             profile: {
               select: {
                 avatar_url: true,
+              },
+            },
+          },
+        },
+        parent: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                full_name: true,
+                profile: {
+                  select: {
+                    avatar_url: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                reactions: true,
+                comments: true,
               },
             },
           },
@@ -988,6 +1058,28 @@ router.get('/reels', authMiddleware, async (req, res) => {
             profile: {
               select: {
                 avatar_url: true,
+              },
+            },
+          },
+        },
+        parent: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                full_name: true,
+                profile: {
+                  select: {
+                    avatar_url: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                reactions: true,
+                comments: true,
               },
             },
           },

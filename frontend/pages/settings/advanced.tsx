@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Layout from '../../components/Layout';
 import BottomNav from '../../components/BottomNav';
@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import Toast from '../../components/Toast';
 import { getUser } from '../../lib/auth';
 import { useRouter } from 'next/router';
+import { usersAPI } from '../../lib/api';
 
 export default function AdvancedSettings() {
   const router = useRouter();
@@ -35,24 +36,67 @@ export default function AdvancedSettings() {
     isVisible: false,
   });
 
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (settings: any) => {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/settings`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(settings),
+  // Load existing settings
+  const { data: settingsData, isLoading: isLoadingSettings, error: settingsError } = useQuery({
+    queryKey: ['userSettings'],
+    queryFn: () => usersAPI.getSettings(),
+  });
+
+  // Update state when settings are loaded
+  useEffect(() => {
+    if (settingsData?.settings) {
+      // Load privacy settings
+      if (settingsData.settings.privacy) {
+        setPrivacySettings({
+          profileVisibility: settingsData.settings.privacy.profileVisibility || 'public',
+          showEmail: settingsData.settings.privacy.showEmail || false,
+          allowMessages: settingsData.settings.privacy.allowMessages !== undefined ? settingsData.settings.privacy.allowMessages : true,
+          allowFollowRequests: settingsData.settings.privacy.allowFollowRequests !== undefined ? settingsData.settings.privacy.allowFollowRequests : true,
+        });
+      }
+      // Load notification settings
+      if (settingsData.settings.notifications) {
+        setNotificationSettings({
+          emailNotifications: settingsData.settings.notifications.emailNotifications !== undefined ? settingsData.settings.notifications.emailNotifications : true,
+          pushNotifications: settingsData.settings.notifications.pushNotifications !== undefined ? settingsData.settings.notifications.pushNotifications : true,
+          newFollows: settingsData.settings.notifications.newFollows !== undefined ? settingsData.settings.notifications.newFollows : true,
+          newMessages: settingsData.settings.notifications.newMessages !== undefined ? settingsData.settings.notifications.newMessages : true,
+          newComments: settingsData.settings.notifications.newComments !== undefined ? settingsData.settings.notifications.newComments : true,
+          newReactions: settingsData.settings.notifications.newReactions !== undefined ? settingsData.settings.notifications.newReactions : true,
+        });
+      }
+    }
+  }, [settingsData]);
+
+  // Show error toast if settings fail to load
+  useEffect(() => {
+    if (settingsError) {
+      console.error('Failed to load settings:', settingsError);
+      setToast({
+        message: 'Failed to load settings. Using defaults.',
+        type: 'error',
+        isVisible: true,
       });
-      if (!res.ok) throw new Error('Failed to update settings');
-      return res.json();
+    }
+  }, [settingsError]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (settings: { privacy?: any; notifications?: any }) => {
+      return usersAPI.updateSettings(settings);
     },
     onSuccess: () => {
       setToast({ message: 'Settings updated successfully!', type: 'success', isVisible: true });
+      // Invalidate settings query to refetch
+      queryClient.invalidateQueries({ queryKey: ['userSettings'] });
     },
-    onError: () => {
-      setToast({ message: 'Failed to update settings', type: 'error', isVisible: true });
+    onError: (error: any) => {
+      console.error('Failed to update settings:', error);
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update settings';
+      setToast({ 
+        message: errorMessage,
+        type: 'error', 
+        isVisible: true 
+      });
     },
   });
 
@@ -63,6 +107,17 @@ export default function AdvancedSettings() {
   const handleNotificationsSave = () => {
     updateSettingsMutation.mutate({ notifications: notificationSettings });
   };
+
+  if (isLoadingSettings) {
+    return (
+      <Layout title="Advanced Settings - Kartess">
+        <div className="min-h-screen bg-gray-50 pb-20 flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+        <BottomNav />
+      </Layout>
+    );
+  }
 
   return (
     <Layout title="Advanced Settings - Kartess">

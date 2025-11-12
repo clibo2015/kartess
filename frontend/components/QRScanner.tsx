@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 import Button from './Button';
@@ -32,81 +32,50 @@ export default function QRScanner({ isOpen, onClose, onSuccess }: QRScannerProps
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen || !scanning) {
-      // Cleanup scanner when modal closes
-      if (scannerRef.current) {
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }
-      return;
-    }
-
-    // Request camera permission before initializing scanner
-    const initScanner = async () => {
-      try {
-        // Request camera permission explicitly
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        // Stop the test stream immediately - we just needed permission
-        stream.getTracks().forEach((track) => track.stop());
-
-        // Initialize scanner after permission is granted
-        const scanner = new Html5QrcodeScanner(
-          scannerIdRef.current,
-          {
-            qrbox: { width: 250, height: 250 },
-            fps: 5,
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          },
-          false
-        );
-
-        scanner.render(
-          (decodedText) => {
-            // QR code scanned
-            handleScan(decodedText);
-          },
-          (errorMessage) => {
-            // Error handling is done in onScanFailure callback
-          }
-        );
-
-        scannerRef.current = scanner;
-      } catch (error: any) {
-        console.error('Camera permission error:', error);
-        setError('Camera permission is required to scan QR codes. Please enable camera access in your browser settings.');
-        setScanning(false);
-      }
-    };
-
-    initScanner();
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }
-    };
-  }, [isOpen, scanning]);
-
-  const handleScan = async (decodedText: string) => {
+  // Handle QR code scan - defined before useEffect that uses it
+  const handleScan = useCallback(async (decodedText: string) => {
     try {
-      // Parse QR code data
-      const qrData = JSON.parse(decodedText);
+      let token: string | null = null;
 
-      if (qrData.type !== 'kartess_contact' || !qrData.token) {
-        setError('Invalid QR code');
+      // Try to parse as URL first (new format for external scanners)
+      try {
+        const url = new URL(decodedText);
+        const qrTokenParam = url.searchParams.get('qr_token');
+        if (qrTokenParam && (url.pathname.includes('/register') || url.pathname === '/')) {
+          token = qrTokenParam;
+        }
+      } catch (urlError) {
+        // Not a URL, try parsing as JSON (old format for backward compatibility)
+        try {
+          const qrData = JSON.parse(decodedText);
+          if (qrData.type === 'kartess_contact' && qrData.token) {
+            token = qrData.token;
+          }
+        } catch (jsonError) {
+          // Neither URL nor JSON - invalid format
+          setError('Invalid QR code format. Please scan a valid Kartess QR code.');
+          return;
+        }
+      }
+
+      if (!token) {
+        setError('Invalid QR code - token not found. Please scan a valid Kartess QR code.');
         return;
       }
 
-      // Stop scanning
+      // Stop scanning immediately to prevent multiple scans
       setScanning(false);
       if (scannerRef.current) {
-        scannerRef.current.clear();
+        try {
+          scannerRef.current.clear().catch((err: any) => {
+            console.warn('Error clearing scanner after scan:', err);
+          });
+        } catch (err) {
+          console.warn('Error clearing scanner after scan:', err);
+        }
         scannerRef.current = null;
       }
 
-      const token = qrData.token;
       setValidating(true);
       setError(null);
 
@@ -114,8 +83,10 @@ export default function QRScanner({ isOpen, onClose, onSuccess }: QRScannerProps
       const validation = await qrAPI.validate(token);
 
       if (!validation.valid) {
-        setError(validation.error || 'Invalid QR code');
+        setError(validation.error || 'Invalid QR code. The QR code may have expired or already been used.');
         setValidating(false);
+        // Allow retry
+        setScanning(true);
         return;
       }
 
@@ -141,12 +112,142 @@ export default function QRScanner({ isOpen, onClose, onSuccess }: QRScannerProps
       if (err.response?.data?.error) {
         setError(err.response.data.error);
       } else if (err.message?.includes('Invalid QR code')) {
-        setError('Invalid QR code format');
+        setError('Invalid QR code format. Please scan a valid Kartess QR code.');
       } else {
         setError('Failed to process QR code. Please try again.');
       }
+      // Allow retry
+      setScanning(true);
     }
-  };
+  }, [router, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !scanning) {
+      // Cleanup scanner when modal closes
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.clear().catch((err: any) => {
+            console.warn('Error clearing scanner:', err);
+          });
+        } catch (err) {
+          console.warn('Error clearing scanner:', err);
+        }
+        scannerRef.current = null;
+      }
+      return;
+    }
+
+    // Wait for DOM element to be available
+    const initScanner = async () => {
+      // Check if element exists
+      const scannerElement = document.getElementById(scannerIdRef.current);
+      if (!scannerElement) {
+        // Retry after a short delay
+        setTimeout(initScanner, 100);
+        return;
+      }
+
+      try {
+        // Check if mediaDevices API is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setError('Camera access is not available in this browser. Please use a modern browser with camera support.');
+          setScanning(false);
+          return;
+        }
+
+        // Request camera permission explicitly before initializing scanner
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'environment', // Prefer back camera on mobile
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            } 
+          });
+          // Stop the test stream immediately - we just needed permission
+          stream.getTracks().forEach((track) => track.stop());
+        } catch (permError: any) {
+          console.error('Camera permission error:', permError);
+          if (permError.name === 'NotAllowedError' || permError.name === 'PermissionDeniedError') {
+            setError('Camera permission was denied. Please enable camera access in your browser settings and try again.');
+          } else if (permError.name === 'NotFoundError' || permError.name === 'DevicesNotFoundError') {
+            setError('No camera found. Please ensure a camera is connected and try again.');
+          } else if (permError.name === 'NotReadableError' || permError.name === 'TrackStartError') {
+            setError('Camera is already in use by another application. Please close other apps using the camera and try again.');
+          } else {
+            setError(`Camera access error: ${permError.message || 'Unknown error'}. Please check your camera settings.`);
+          }
+          setScanning(false);
+          return;
+        }
+
+        // Small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verify element still exists
+        const element = document.getElementById(scannerIdRef.current);
+        if (!element) {
+          setError('Scanner element not found. Please try again.');
+          setScanning(false);
+          return;
+        }
+
+        // Clear any existing content in the element
+        element.innerHTML = '';
+
+        // Initialize scanner after permission is granted
+        const scanner = new Html5QrcodeScanner(
+          scannerIdRef.current,
+          {
+            qrbox: { width: 250, height: 250 },
+            fps: 10,
+            aspectRatio: 1.0,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+            showZoomSliderIfSupported: true,
+            showTorchButtonIfSupported: true,
+          },
+          false // verbose
+        );
+
+        scanner.render(
+          (decodedText) => {
+            // QR code scanned successfully
+            handleScan(decodedText);
+          },
+          (errorMessage) => {
+            // Scanner is running, ignore minor errors
+            // Only log if it's a significant error
+            if (errorMessage && !errorMessage.includes('NotFoundException') && !errorMessage.includes('No MultiFormat Readers')) {
+              console.debug('QR scanner:', errorMessage);
+            }
+          }
+        );
+
+        scannerRef.current = scanner;
+      } catch (error: any) {
+        console.error('Scanner initialization error:', error);
+        setError(`Failed to initialize camera scanner: ${error.message || 'Unknown error'}. Please try again.`);
+        setScanning(false);
+      }
+    };
+
+    // Start initialization with a small delay to ensure modal is rendered
+    const timeoutId = setTimeout(initScanner, 200);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.clear().catch((err: any) => {
+            console.warn('Error clearing scanner on cleanup:', err);
+          });
+        } catch (err) {
+          console.warn('Error clearing scanner on cleanup:', err);
+        }
+        scannerRef.current = null;
+      }
+    };
+  }, [isOpen, scanning, handleScan]);
 
   const handlePresetSelect = async (presetName: 'personal' | 'professional' | 'custom') => {
     if (!scannedToken) return;

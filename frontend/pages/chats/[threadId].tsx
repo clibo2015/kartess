@@ -7,6 +7,7 @@ import Layout from '../../components/Layout';
 import BottomNav from '../../components/BottomNav';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import Button from '../../components/Button';
+import ConfirmModal from '../../components/ConfirmModal';
 import { chatsAPI, messagesAPI } from '../../lib/api';
 import { decryptMessage, encryptMessage } from '../../lib/encryption';
 import { getSocket } from '../../lib/socket';
@@ -27,6 +28,9 @@ export default function ChatView() {
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [showDeleteMessageConfirm, setShowDeleteMessageConfirm] = useState(false);
+  const [showDeleteChatConfirm, setShowDeleteChatConfirm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,13 +102,35 @@ export default function ChatView() {
       queryClient.invalidateQueries({ queryKey: ['messages', activeThreadId] });
     });
 
+    // Listen for message deleted
+    socketInstance.on('message.deleted', (data: { message_id: string; thread_id: string }) => {
+      if (data.thread_id === activeThreadId) {
+        queryClient.setQueryData(['messages', activeThreadId], (old: any) => {
+          if (!old) return old;
+          return {
+            ...old,
+            messages: old.messages.filter((msg: any) => msg.id !== data.message_id),
+          };
+        });
+      }
+    });
+
+    // Listen for thread deleted
+    socketInstance.on('thread.deleted', (data: { thread_id: string }) => {
+      if (data.thread_id === activeThreadId) {
+        router.push('/chats');
+      }
+    });
+
     return () => {
       socketInstance.emit('leave:thread', activeThreadId);
       socketInstance.off('message.new');
       socketInstance.off('thread:typing');
       socketInstance.off('message.read');
+      socketInstance.off('message.deleted');
+      socketInstance.off('thread.deleted');
     };
-  }, [activeThreadId, queryClient]);
+  }, [activeThreadId, queryClient, router]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -217,6 +243,41 @@ export default function ChatView() {
     scrollToBottom();
   }, [messages]);
 
+  // Delete message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: (messageId: string) => messagesAPI.delete(messageId),
+    onSuccess: () => {
+      setShowDeleteMessageConfirm(false);
+      setSelectedMessage(null);
+      refetchMessages();
+    },
+    onError: (error: any) => {
+      alert(error?.response?.data?.error || 'Failed to delete message');
+    },
+  });
+
+  // Delete chat mutation
+  const deleteChatMutation = useMutation({
+    mutationFn: () => chatsAPI.deleteThread(activeThreadId as string),
+    onSuccess: () => {
+      setShowDeleteChatConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ['chatThreads'] });
+      router.push('/chats');
+    },
+    onError: (error: any) => {
+      alert(error?.response?.data?.error || 'Failed to delete chat');
+    },
+  });
+
+  const handleDeleteMessage = (messageId: string) => {
+    setSelectedMessage(messageId);
+    setShowDeleteMessageConfirm(true);
+  };
+
+  const handleDeleteChat = () => {
+    setShowDeleteChatConfirm(true);
+  };
+
   if (!router.isReady || threadsLoading) {
     return (
       <Layout title="Chat - Kartess">
@@ -277,25 +338,34 @@ export default function ChatView() {
                 )}
               </div>
             </div>
-            {/* Call Buttons */}
-            {thread.type === '1:1' && (
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => router.push(`/chats/${activeThreadId}/call?type=voice`)}
-                  className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
-                  title="Voice Call"
-                >
-                  📞
-                </button>
-                <button
-                  onClick={() => router.push(`/chats/${activeThreadId}/call?type=video`)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                  title="Video Call"
-                >
-                  📹
-                </button>
-              </div>
-            )}
+            {/* Call Buttons and Delete Chat */}
+            <div className="flex gap-2 flex-shrink-0">
+              {thread.type === '1:1' && (
+                <>
+                  <button
+                    onClick={() => router.push(`/chats/${activeThreadId}/call?type=voice`)}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                    title="Voice Call"
+                  >
+                    📞
+                  </button>
+                  <button
+                    onClick={() => router.push(`/chats/${activeThreadId}/call?type=video`)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                    title="Video Call"
+                  >
+                    📹
+                  </button>
+                </>
+              )}
+              <button
+                onClick={handleDeleteChat}
+                className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                title="Delete Chat"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -309,46 +379,59 @@ export default function ChatView() {
               return (
                 <div
                   key={msg.id}
-                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}
                 >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      isOwn
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-900'
-                    }`}
-                  >
-                    {msg.user_id !== currentUser?.id && (
-                      <p className="text-xs font-medium mb-1 opacity-75">
-                        {msg.user.full_name}
-                      </p>
-                    )}
-                    <p className="text-sm whitespace-pre-wrap">{decryptedContent}</p>
-                    {msg.media_urls && Array.isArray(msg.media_urls) && (
-                      <div className="mt-2 space-y-2">
-                        {(msg.media_urls as string[]).map((url, idx) => (
-                          <div key={idx} className="rounded-lg overflow-hidden">
-                            {url.match(/\.(mp4|webm|mov)$/i) ? (
-                              <video src={url} controls className="max-w-full" />
-                            ) : (
-                              <Image
-                                src={url}
-                                alt={`Media ${idx + 1}`}
-                                width={300}
-                                height={200}
-                                className="object-cover rounded-lg"
-                              />
-                            )}
-                          </div>
-                        ))}
+                  <div className="relative">
+                    <div
+                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                        isOwn
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-900'
+                      }`}
+                    >
+                      {msg.user_id !== currentUser?.id && (
+                        <p className="text-xs font-medium mb-1 opacity-75">
+                          {msg.user.full_name}
+                        </p>
+                      )}
+                      <p className="text-sm whitespace-pre-wrap">{decryptedContent}</p>
+                      {msg.media_urls && Array.isArray(msg.media_urls) && (
+                        <div className="mt-2 space-y-2">
+                          {(msg.media_urls as string[]).map((url, idx) => (
+                            <div key={idx} className="rounded-lg overflow-hidden">
+                              {url.match(/\.(mp4|webm|mov)$/i) ? (
+                                <video src={url} controls className="max-w-full" />
+                              ) : (
+                                <Image
+                                  src={url}
+                                  alt={`Media ${idx + 1}`}
+                                  width={300}
+                                  height={200}
+                                  className="object-cover rounded-lg"
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs opacity-75">
+                          {new Date(msg.created_at).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                        {isOwn && (
+                          <button
+                            onClick={() => handleDeleteMessage(msg.id)}
+                            className="ml-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-500"
+                            title="Delete message"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
-                    )}
-                    <p className="text-xs opacity-75 mt-1">
-                      {new Date(msg.created_at).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
+                    </div>
                   </div>
                 </div>
               );
@@ -453,6 +536,45 @@ export default function ChatView() {
         </div>
 
         <BottomNav />
+
+        {/* Delete Message Confirmation Modal */}
+        <ConfirmModal
+          isOpen={showDeleteMessageConfirm}
+          title="Delete Message?"
+          message="This message will be deleted for everyone in this chat. This action cannot be undone."
+          confirmText={deleteMessageMutation.isPending ? 'Deleting...' : 'Delete'}
+          confirmVariant="danger"
+          onCancel={() => {
+            if (!deleteMessageMutation.isPending) {
+              setShowDeleteMessageConfirm(false);
+              setSelectedMessage(null);
+            }
+          }}
+          onConfirm={() => {
+            if (!deleteMessageMutation.isPending && selectedMessage) {
+              deleteMessageMutation.mutate(selectedMessage);
+            }
+          }}
+        />
+
+        {/* Delete Chat Confirmation Modal */}
+        <ConfirmModal
+          isOpen={showDeleteChatConfirm}
+          title="Delete Chat?"
+          message="This will delete the entire chat and all messages for all participants. This action cannot be undone."
+          confirmText={deleteChatMutation.isPending ? 'Deleting...' : 'Delete Chat'}
+          confirmVariant="danger"
+          onCancel={() => {
+            if (!deleteChatMutation.isPending) {
+              setShowDeleteChatConfirm(false);
+            }
+          }}
+          onConfirm={() => {
+            if (!deleteChatMutation.isPending) {
+              deleteChatMutation.mutate();
+            }
+          }}
+        />
       </Layout>
   );
 }

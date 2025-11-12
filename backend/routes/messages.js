@@ -198,4 +198,61 @@ router.post(
   }
 });
 
+/**
+ * DELETE /api/messages/:messageId
+ * Delete a message (only message sender can delete)
+ */
+router.delete('/:messageId', authMiddleware, async (req, res) => {
+  try {
+    const { messageId } = req.params;
+
+    // Get message
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        thread: {
+          select: {
+            id: true,
+            participants: true,
+          },
+        },
+      },
+    });
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' });
+    }
+
+    // Check if user is the sender
+    if (message.user_id !== req.user.id) {
+      return res.status(403).json({ error: 'Not authorized to delete this message' });
+    }
+
+    // Delete message (cascade will delete message reads)
+    await prisma.message.delete({
+      where: { id: messageId },
+    });
+
+    // Update thread updated_at
+    await prisma.chatThread.update({
+      where: { id: message.thread_id },
+      data: { updated_at: new Date() },
+    });
+
+    // Emit message deleted via Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`thread:${message.thread_id}`).emit('message.deleted', {
+        message_id: messageId,
+        thread_id: message.thread_id,
+      });
+    }
+
+    res.json({ message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error('Delete message error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

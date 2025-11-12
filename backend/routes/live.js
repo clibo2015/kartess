@@ -28,7 +28,7 @@ function stringToNumericUID(userId) {
  */
 router.post('/create', authMiddleware, async (req, res) => {
   try {
-    const { type = 'live', title, description, scheduled_at, thread_id } = req.body;
+    const { type = 'live', title, description, category, scheduled_at, thread_id } = req.body;
 
     // Check Daily.co API key
     if (!process.env.DAILY_API_KEY) {
@@ -101,6 +101,7 @@ router.post('/create', authMiddleware, async (req, res) => {
         thread_id: thread_id || undefined,
         title: title || undefined,
         description: description || undefined,
+        category: category || undefined, // Category for live streams
         daily_room_url: room.url,
         daily_token: token,
         status: scheduled_at ? 'scheduled' : 'active',
@@ -174,10 +175,24 @@ router.post('/create', authMiddleware, async (req, res) => {
       }
     }
 
-    // If this is a live stream, emit to all users
+    // If this is a live stream, notify contacts only
     if (type === 'live') {
-      const io = req.app.get('io');
-      if (io) {
+      try {
+        // Get host's approved contacts
+        const contacts = await prisma.contact.findMany({
+          where: {
+            OR: [
+              { sender_id: req.user.id, status: 'approved' },
+              { receiver_id: req.user.id, status: 'approved' },
+            ],
+          },
+        });
+
+        // Get contact user IDs
+        const contactUserIds = contacts.map((contact) => 
+          contact.sender_id === req.user.id ? contact.receiver_id : contact.sender_id
+        );
+
         // Get host info
         const host = await prisma.user.findUnique({
           where: { id: req.user.id },
@@ -193,13 +208,43 @@ router.post('/create', authMiddleware, async (req, res) => {
           },
         });
 
-        // Emit new live stream event
-        io.emit('live.stream.started', {
-          sessionId: session.id,
-          host: host,
-          title: title || 'Live Stream',
-          roomUrl: room.url,
-        });
+        const io = req.app.get('io');
+        if (io && contactUserIds.length > 0) {
+          // Emit to contacts only
+          contactUserIds.forEach((contactId) => {
+            io.to(`user:${contactId}`).emit('live.stream.started', {
+              sessionId: session.id,
+              host: host,
+              title: title || 'Live Stream',
+              description: description || undefined,
+              category: category || undefined,
+              roomUrl: room.url,
+            });
+          });
+        }
+
+        // Create notifications for contacts
+        if (contactUserIds.length > 0) {
+          await Promise.all(
+            contactUserIds.map((contactId) =>
+              prisma.notification.create({
+                data: {
+                  user_id: contactId,
+                  sender_id: req.user.id,
+                  type: 'live',
+                  title: 'Live Stream Started',
+                  message: `${host?.full_name || host?.username} is now live streaming${title ? `: ${title}` : ''}`,
+                  link: `/live/${session.id}`,
+                },
+              }).catch((err) => {
+                logger.error('Failed to create live stream notification', { error: err.message });
+              })
+            )
+          );
+        }
+      } catch (error) {
+        logger.error('Failed to send live stream notifications', { error: error.message });
+        // Don't fail the request if notification fails
       }
     }
 

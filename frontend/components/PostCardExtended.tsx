@@ -29,7 +29,26 @@ interface PostCardExtendedProps {
       comments: number;
     };
     reactions?: Array<{ type: string }>;
-    parent?: any;
+    parent?: {
+      id: string;
+      content: string;
+      media_urls?: string[] | null;
+      tags?: string[] | null;
+      created_at: string;
+      user: {
+        id: string;
+        username: string;
+        full_name: string;
+        profile?: {
+          avatar_url?: string | null;
+        } | null;
+      };
+      _count?: {
+        reactions: number;
+        comments: number;
+      };
+      is_poll?: boolean;
+    } | null;
     is_poll?: boolean;
   };
   onRepost?: (postId: string) => void;
@@ -50,6 +69,7 @@ export default function PostCardExtended({ post, onRepost }: PostCardExtendedPro
   const queryClient = useQueryClient();
   const currentUser = getUser();
   const isOwner = currentUser?.id === post.user.id;
+  const isRepost = !!post.parent;
 
   const deleteMutation = useMutation({
     mutationFn: () => postsAPI.delete(post.id),
@@ -66,8 +86,12 @@ export default function PostCardExtended({ post, onRepost }: PostCardExtendedPro
     },
   });
 
-  const mediaUrls = (post.media_urls as string[]) || [];
-  const tags = (post.tags as string[]) || [];
+  // For reposts: show parent post's media and tags, but repost author's comment
+  // For regular posts: show post's own media and tags
+  const displayPost = isRepost && post.parent ? post.parent : post;
+  const mediaUrls = (displayPost.media_urls as string[]) || [];
+  const tags = (displayPost.tags as string[]) || [];
+  const displayContent = displayPost.content;
 
   const moduleColors: Record<string, string> = {
     connect: 'bg-blue-100 text-blue-700',
@@ -133,18 +157,72 @@ export default function PostCardExtended({ post, onRepost }: PostCardExtendedPro
           </div>
         </div>
 
-        {/* Repost indicator */}
-        {post.parent && (
-          <div className="mb-2 text-sm text-gray-500">
-            🔄 Reposted
+        {/* Repost indicator and reposter's comment */}
+        {isRepost && post.parent && (
+          <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">🔄</span>
+              <Link href={`/${post.user.username}/profile`}>
+                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  {post.user.full_name}
+                </span>
+              </Link>
+              <span className="text-sm text-gray-500 dark:text-gray-400">reposted</span>
+            </div>
+            {post.content && (
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-2 whitespace-pre-wrap">
+                {post.content}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Post Content */}
-        <p className="text-gray-900 mb-3 whitespace-pre-wrap">{post.content}</p>
+        {/* Original Post (for reposts) or Regular Post Content */}
+        {isRepost && post.parent && (
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-3 bg-white dark:bg-gray-800">
+            {/* Original Post Author */}
+            <div className="flex items-center mb-2">
+              <Link href={`/${post.parent.user.username}/profile`}>
+                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden mr-2 flex-shrink-0">
+                  {post.parent.user.profile?.avatar_url ? (
+                    <Image
+                      src={post.parent.user.profile.avatar_url}
+                      alt={post.parent.user.full_name}
+                      width={32}
+                      height={32}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">
+                      {post.parent.user.full_name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </Link>
+              <div className="flex-1 min-w-0">
+                <Link href={`/${post.parent.user.username}/profile`}>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                    {post.parent.user.full_name}
+                  </p>
+                </Link>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  @{post.parent.user.username}
+                </p>
+              </div>
+            </div>
+            
+            {/* Original Post Content */}
+            <p className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">{displayContent}</p>
+          </div>
+        )}
+
+        {/* Regular Post Content (not a repost) */}
+        {!isRepost && (
+          <p className="text-gray-900 dark:text-gray-100 mb-3 whitespace-pre-wrap">{displayContent}</p>
+        )}
 
         {/* Poll */}
-        {post.is_poll && <PollComponent postId={post.id} />}
+        {displayPost.is_poll && <PollComponent postId={displayPost.id} />}
 
         {/* Post Media */}
         {mediaUrls.length > 0 && (
@@ -213,12 +291,12 @@ export default function PostCardExtended({ post, onRepost }: PostCardExtendedPro
           </div>
         )}
 
-        {/* Reactions */}
+        {/* Reactions - react to the original post if repost, otherwise react to current post */}
         <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-700">
           <ReactionsBar 
-            post={post} 
+            post={displayPost} 
             variant="default" 
-            onRepost={onRepost ? () => onRepost(post.id) : undefined}
+            onRepost={onRepost && !isRepost ? () => onRepost(displayPost.id) : undefined}
           />
           <span className="text-xs text-gray-500 dark:text-gray-400">
             {new Date(post.created_at).toLocaleDateString()}

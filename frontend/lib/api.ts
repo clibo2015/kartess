@@ -450,6 +450,11 @@ export const chatsAPI = {
     const response = await api.get(`/api/chats/threads/${threadId}/messages`, { params });
     return response.data;
   },
+
+  deleteThread: async (threadId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/chats/threads/${threadId}`);
+    return response.data;
+  },
 };
 
 export const messagesAPI = {
@@ -474,6 +479,11 @@ export const messagesAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  delete: async (messageId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/api/messages/${messageId}`);
     return response.data;
   },
 };
@@ -677,6 +687,7 @@ export const liveAPI = {
     type?: string;
     title?: string;
     description?: string;
+    category?: string; // For live streams: 'Gaming', 'Music', 'Art & Creative', 'Technology', 'Education', 'Lifestyle', 'Other'
     scheduled_at?: string;
     thread_id?: string; // For calls: thread ID to call participants
   }): Promise<{
@@ -784,6 +795,14 @@ export const highlightsAPI = {
 };
 
 export const usersAPI = {
+  getSettings: async (): Promise<{ settings: any }> => {
+    const response = await api.get('/api/users/settings');
+    return response.data;
+  },
+  updateSettings: async (settings: { privacy?: any; notifications?: any }): Promise<{ message: string; user: any }> => {
+    const response = await api.patch('/api/users/settings', settings);
+    return response.data;
+  },
   deleteAccount: async (): Promise<{ message: string }> => {
     const response = await api.delete('/api/users/account');
     return response.data;

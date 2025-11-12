@@ -300,4 +300,50 @@ router.get('/threads/:threadId/messages', authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/chats/threads/:threadId
+ * Delete a chat thread (only participants can delete)
+ * Note: This will delete the thread and all messages for all participants
+ */
+router.delete('/threads/:threadId', authMiddleware, async (req, res) => {
+  try {
+    const { threadId } = req.params;
+
+    // Get thread
+    const thread = await prisma.chatThread.findUnique({
+      where: { id: threadId },
+    });
+
+    if (!thread) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    // Verify user is participant
+    const participants = Array.isArray(thread.participants) ? thread.participants : [];
+    if (!participants.includes(req.user.id)) {
+      return res.status(403).json({ error: 'Not authorized to delete this thread' });
+    }
+
+    // Delete thread (cascade will delete all messages and message reads)
+    await prisma.chatThread.delete({
+      where: { id: threadId },
+    });
+
+    // Emit thread deleted via Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      participants.forEach((participantId) => {
+        io.to(`user:${participantId}`).emit('thread.deleted', {
+          thread_id: threadId,
+        });
+      });
+    }
+
+    res.json({ message: 'Thread deleted successfully' });
+  } catch (error) {
+    console.error('Delete thread error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

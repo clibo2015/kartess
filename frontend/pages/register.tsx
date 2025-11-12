@@ -33,6 +33,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [qrToken, setQrToken] = useState<string | null>(null);
+  const [qrValidating, setQrValidating] = useState(false);
+  const [qrUser, setQrUser] = useState<{ username?: string; full_name?: string } | null>(null);
   const [formData, setFormData] = useState<FormData>({
     full_name: '',
     email: '',
@@ -40,11 +42,30 @@ export default function Register() {
     password: '',
   });
 
-  // Extract QR token from query params
+  // Extract QR token from query params and validate it
   useEffect(() => {
     const { qr_token } = router.query;
     if (qr_token && typeof qr_token === 'string') {
       setQrToken(qr_token);
+      // Validate QR token
+      const validateToken = async () => {
+        setQrValidating(true);
+        try {
+          const { qrAPI } = await import('../lib/api');
+          const validation = await qrAPI.validate(qr_token);
+          if (validation.valid && validation.user) {
+            setQrUser(validation.user);
+          } else {
+            setErrors({ general: validation.error || 'Invalid QR code. The QR code may have expired or already been used.' });
+          }
+        } catch (error: any) {
+          console.error('QR validation error:', error);
+          setErrors({ general: 'Failed to validate QR code. Please try again or register without QR code.' });
+        } finally {
+          setQrValidating(false);
+        }
+      };
+      validateToken();
     }
   }, [router.query]);
 
@@ -126,6 +147,16 @@ export default function Register() {
           </div>
 
           <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+            {qrValidating && (
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-600 dark:text-blue-400 text-sm">
+                Validating QR code...
+              </div>
+            )}
+            {qrUser && !qrValidating && (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm">
+                ✓ Connecting you with {qrUser.full_name || qrUser.username || 'this user'} after registration
+              </div>
+            )}
             {errors.general && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm">
                 {errors.general}

@@ -46,12 +46,24 @@ export default function QRGenerator({ isOpen, onClose }: QRGeneratorProps) {
     generateMutation.mutate(selectedPreset);
   };
 
+  // Generate QR code with URL format for external scanners
+  // Format: https://domain.com/register?qr_token=TOKEN
+  // This works for both external scanners (redirects to register page) and internal scanner (can parse URL)
+  const getFrontendUrl = () => {
+    if (typeof window !== 'undefined') {
+      // Try to get from environment variable first
+      const envUrl = process.env.NEXT_PUBLIC_FRONTEND_URL;
+      if (envUrl) return envUrl;
+      
+      // Fallback to current origin
+      return window.location.origin;
+    }
+    // Server-side fallback
+    return process.env.NEXT_PUBLIC_FRONTEND_URL || 'https://kartess.com';
+  };
+
   const qrValue = qrToken
-    ? JSON.stringify({
-        type: 'kartess_contact',
-        token: qrToken,
-        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      })
+    ? `${getFrontendUrl()}/register?qr_token=${encodeURIComponent(qrToken)}`
     : '';
 
   return (

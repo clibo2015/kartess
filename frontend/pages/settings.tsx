@@ -25,7 +25,7 @@ export default function Settings() {
       title: 'Edit Profile',
       description: 'Update your bio, avatar, and personal information',
       icon: '👤',
-      route: user?.username ? `/${user.username}/profile` : '/home',
+      route: '/settings/profile-edit',
       color: 'bg-blue-500',
     },
     {

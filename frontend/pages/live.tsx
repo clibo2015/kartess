@@ -14,15 +14,8 @@ export default function LiveStreaming() {
   const router = useRouter();
   const currentUser = getUser();
 
-  const createSessionMutation = useMutation({
-    mutationFn: () => liveAPI.createSession({ type: 'live' }),
-    onSuccess: (data) => {
-      router.push(`/live/${data.session.id}`);
-    },
-  });
-
   const handleGoLive = () => {
-    createSessionMutation.mutate();
+    router.push('/live/create');
   };
 
   return (
@@ -35,14 +28,9 @@ export default function LiveStreaming() {
               <Button
                 variant="primary"
                 onClick={handleGoLive}
-                disabled={createSessionMutation.isPending}
                 className="px-4 py-2 text-sm bg-red-600"
               >
-                {createSessionMutation.isPending ? (
-                  <LoadingSpinner size="sm" />
-                ) : (
-                  '🔴 Go Live'
-                )}
+                🔴 Go Live
               </Button>
             </div>
           </div>
