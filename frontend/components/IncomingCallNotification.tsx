@@ -40,13 +40,15 @@ export default function IncomingCallNotification({ call, onAccept, onReject }: I
   const handleAccept = async () => {
     setIsProcessing(true);
     try {
+      // Accept the call - this will return room URL and token
       await liveAPI.acceptCall(call.sessionId);
       onAccept();
-      // Navigate to call page
+      // Navigate to call page with sessionId - the page will auto-connect
       router.push(`/chats/${call.threadId}/call?sessionId=${call.sessionId}&type=${call.type}`);
     } catch (error) {
       console.error('Failed to accept call', error);
       setIsProcessing(false);
+      alert('Failed to accept call. Please try again.');
     }
   };
 

@@ -50,6 +50,15 @@ export default function CallView() {
     enabled: !!threadId,
   });
 
+  // Auto-start call when joining an accepted call (sessionId in query)
+  useEffect(() => {
+    if (sessionId && typeof sessionId === 'string' && sessionData && !shouldStart && !isLoading) {
+      // User is joining an accepted call - automatically start connecting
+      setShouldStart(true);
+      setCallStatus('accepted');
+    }
+  }, [sessionId, sessionData, shouldStart, isLoading]);
+
   // Listen for call status updates via Socket.io
   useEffect(() => {
     if (!threadId || typeof window === 'undefined') return;
@@ -60,7 +69,7 @@ export default function CallView() {
     socket.on('call.accepted', (data: any) => {
       if (sessionData?.session?.id === data.sessionId) {
         setCallStatus('accepted');
-        // Auto-start the call when accepted
+        // Auto-start the call when accepted (for the caller)
         if (!shouldStart) {
           setShouldStart(true);
         }

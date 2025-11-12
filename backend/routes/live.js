@@ -407,14 +407,46 @@ router.post('/accept/:sessionId', authMiddleware, async (req, res) => {
       }
     }
 
-    // Update call status to accepted
+    // Update call status to accepted and add user to participants
+    const participants = Array.isArray(session.participants) ? session.participants : [];
+    if (!participants.includes(req.user.id)) {
+      participants.push(req.user.id);
+    }
+
     const updated = await prisma.callSession.update({
       where: { id: sessionId },
       data: {
         call_status: 'accepted',
         answered_at: new Date(),
         status: 'active',
+        participants,
       },
+    });
+
+    // Get room URL and token for the accepting user
+    if (!updated.daily_room_url) {
+      return res.status(400).json({ error: 'Call session does not have a Daily.co room configured' });
+    }
+
+    const roomName = daily.extractRoomName(updated.daily_room_url);
+    if (!roomName) {
+      return res.status(500).json({ error: 'Invalid room URL' });
+    }
+
+    // Get user details for token
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        username: true,
+        full_name: true,
+      },
+    });
+
+    // Generate meeting token for the accepting user (participant, not owner)
+    const token = await daily.createMeetingToken(roomName, {
+      is_owner: false, // Accepting user is a participant, not the owner
+      user_name: user?.full_name || user?.username || 'Participant',
     });
 
     // Notify caller that call was accepted
@@ -426,7 +458,11 @@ router.post('/accept/:sessionId', authMiddleware, async (req, res) => {
       });
     }
 
-    res.json({ session: updated });
+    res.json({ 
+      session: updated,
+      roomUrl: updated.daily_room_url,
+      token,
+    });
   } catch (error) {
     logger.error('Accept call error', { error: error.message });
     res.status(500).json({ error: 'Internal server error' });

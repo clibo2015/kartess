@@ -710,7 +710,7 @@ export const liveAPI = {
     return response.data;
   },
 
-  acceptCall: async (sessionId: string): Promise<{ session: any }> => {
+  acceptCall: async (sessionId: string): Promise<{ session: any; roomUrl?: string; token?: string }> => {
     const response = await api.post(`/api/live/accept/${sessionId}`);
     return response.data;
   },
