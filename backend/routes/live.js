@@ -387,7 +387,6 @@ router.post('/accept/:sessionId', authMiddleware, async (req, res) => {
     }
 
     // Check if user is a participant (not the host)
-    const participants = Array.isArray(session.participants) ? session.participants : [];
     const isHost = session.host_id === req.user.id;
 
     if (isHost) {
@@ -408,7 +407,9 @@ router.post('/accept/:sessionId', authMiddleware, async (req, res) => {
     }
 
     // Update call status to accepted and add user to participants
-    const participants = Array.isArray(session.participants) ? session.participants : [];
+    // Create a new array to avoid mutating the original session.participants
+    const existingParticipants = Array.isArray(session.participants) ? session.participants : [];
+    const participants = [...existingParticipants];
     if (!participants.includes(req.user.id)) {
       participants.push(req.user.id);
     }
